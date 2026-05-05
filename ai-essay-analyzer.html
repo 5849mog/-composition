@@ -1,0 +1,1443 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 作文评析器</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;500;600;700&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Noto+Sans+SC:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0c0b09;
+    --bg2: #141210;
+    --bg3: #1c1916;
+    --border: rgba(200,169,110,0.15);
+    --border-strong: rgba(200,169,110,0.35);
+    --red: #c8372a;
+    --red-glow: rgba(200,55,42,0.25);
+    --gold: #c8a96e;
+    --gold-dim: rgba(200,169,110,0.5);
+    --cream: #f0ebe0;
+    --cream-dim: rgba(240,235,224,0.6);
+    --cream-faint: rgba(240,235,224,0.15);
+    --text: #e8e0d0;
+    --text-dim: rgba(232,224,208,0.55);
+    --success: #5a9e6f;
+    --warn: #c8a96e;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { font-size: 16px; scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Serif SC', serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  /* Grain texture */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.6;
+  }
+
+  /* Ambient red glow top */
+  body::after {
+    content: '';
+    position: fixed;
+    top: -200px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 700px;
+    height: 400px;
+    background: radial-gradient(ellipse, rgba(180,40,30,0.08) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 0 24px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ── HEADER ── */
+  header {
+    padding: 48px 0 0;
+    text-align: center;
+    position: relative;
+  }
+
+  .header-ornament {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-bottom: 20px;
+    opacity: 0.45;
+  }
+  .header-ornament span {
+    height: 1px;
+    width: 80px;
+    background: linear-gradient(90deg, transparent, var(--gold));
+  }
+  .header-ornament span:last-child {
+    background: linear-gradient(90deg, var(--gold), transparent);
+  }
+  .header-ornament svg { width: 12px; height: 12px; fill: var(--gold); }
+
+  .site-title {
+    font-family: 'Noto Serif SC', serif;
+    font-size: clamp(26px, 5vw, 42px);
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    color: var(--cream);
+    line-height: 1.2;
+    position: relative;
+  }
+  .site-title em {
+    font-style: normal;
+    color: var(--gold);
+  }
+
+  .site-sub {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 14px;
+    font-style: italic;
+    color: var(--text-dim);
+    letter-spacing: 0.08em;
+    margin-top: 8px;
+  }
+
+  .settings-btn {
+    position: fixed;
+    top: 24px;
+    right: 24px;
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--border-strong);
+    background: var(--bg3);
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    z-index: 100;
+    color: var(--gold-dim);
+  }
+  .settings-btn:hover {
+    border-color: var(--gold);
+    color: var(--gold);
+    box-shadow: 0 0 16px rgba(200,169,110,0.2);
+  }
+  .settings-btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; }
+
+  /* ── DIVIDER ── */
+  .section-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 40px 0 32px;
+  }
+  .section-divider::before, .section-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+  .section-divider span {
+    color: var(--gold-dim);
+    font-size: 11px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    font-family: 'Noto Sans SC', sans-serif;
+    font-weight: 300;
+  }
+
+  /* ── INPUT AREA ── */
+  .input-panel {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    transition: border-color 0.3s, box-shadow 0.3s;
+    position: relative;
+  }
+  .input-panel:focus-within {
+    border-color: var(--border-strong);
+    box-shadow: 0 0 0 1px rgba(200,169,110,0.08), 0 8px 40px rgba(0,0,0,0.4);
+  }
+
+  .input-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg3);
+  }
+
+  .lang-badge {
+    font-family: 'Noto Sans SC', sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    padding: 3px 10px;
+    border-radius: 2px;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    transition: all 0.3s;
+  }
+  .lang-badge.cn { border-color: rgba(200,55,42,0.4); color: #d4776a; }
+  .lang-badge.en { border-color: rgba(90,158,111,0.4); color: #7ab894; }
+
+  .char-count {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+
+  #essay-input {
+    width: 100%;
+    min-height: 320px;
+    max-height: 600px;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: 'Noto Serif SC', serif;
+    font-size: 15px;
+    line-height: 2;
+    padding: 24px;
+    resize: vertical;
+    caret-color: var(--gold);
+  }
+  #essay-input::placeholder {
+    color: var(--text-dim);
+    font-style: italic;
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 16px;
+  }
+
+  /* ── BUTTONS ── */
+  .btn-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-top: 24px;
+    flex-wrap: wrap;
+  }
+
+  .btn-analyze {
+    position: relative;
+    padding: 14px 48px;
+    background: var(--red);
+    color: #fff;
+    border: none;
+    border-radius: 2px;
+    font-family: 'Noto Serif SC', serif;
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    cursor: pointer;
+    transition: all 0.25s;
+    overflow: hidden;
+  }
+  .btn-analyze::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 50%);
+    opacity: 0;
+    transition: opacity 0.25s;
+  }
+  .btn-analyze:hover::before { opacity: 1; }
+  .btn-analyze:hover {
+    background: #d94035;
+    box-shadow: 0 4px 24px rgba(200,55,42,0.4), 0 0 0 1px rgba(200,55,42,0.3);
+    transform: translateY(-1px);
+  }
+  .btn-analyze:active { transform: translateY(0); }
+  .btn-analyze:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+
+  .btn-clear {
+    padding: 14px 24px;
+    background: transparent;
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    font-family: 'Noto Sans SC', sans-serif;
+    font-size: 13px;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-clear:hover {
+    border-color: var(--border-strong);
+    color: var(--text);
+  }
+
+  /* ── LOADING ── */
+  .analysis-loading {
+    display: none;
+    text-align: center;
+    padding: 48px 24px;
+    animation: fadeIn 0.4s ease;
+  }
+  .analysis-loading.active { display: block; }
+
+  .thinking-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 16px;
+    font-style: italic;
+    color: var(--gold-dim);
+    margin-bottom: 24px;
+  }
+  .thinking-dots span {
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--gold);
+    animation: dot-pulse 1.4s ease-in-out infinite;
+  }
+  .thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+  @keyframes dot-pulse {
+    0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+    40% { transform: scale(1); opacity: 1; }
+  }
+
+  .stage-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-width: 340px;
+    margin: 0 auto;
+    text-align: left;
+  }
+
+  .stage-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    border-radius: 3px;
+    font-family: 'Noto Sans SC', sans-serif;
+    font-size: 13px;
+    color: var(--text-dim);
+    background: transparent;
+    transition: all 0.4s;
+    letter-spacing: 0.05em;
+  }
+  .stage-item.active {
+    background: var(--bg3);
+    color: var(--cream);
+    border-left: 2px solid var(--gold);
+  }
+  .stage-item.done {
+    color: var(--success);
+  }
+  .stage-item.done .stage-icon { color: var(--success); }
+  .stage-item .stage-icon { width: 16px; flex-shrink: 0; text-align: center; }
+  .stage-item .stage-num {
+    width: 18px;
+    height: 18px;
+    border: 1px solid currentColor;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    flex-shrink: 0;
+  }
+
+  /* ── RESULTS ── */
+  #results {
+    display: none;
+    animation: fadeIn 0.6s ease;
+  }
+  #results.active { display: block; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Score Hero */
+  .score-hero {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+    padding: 32px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+
+  .score-ring-wrap {
+    position: relative;
+    flex-shrink: 0;
+  }
+  .score-ring-wrap svg { width: 120px; height: 120px; transform: rotate(-90deg); }
+  .score-ring-track { fill: none; stroke: var(--bg3); stroke-width: 6; }
+  .score-ring-fill {
+    fill: none;
+    stroke: var(--gold);
+    stroke-width: 6;
+    stroke-linecap: round;
+    stroke-dasharray: 314;
+    stroke-dashoffset: 314;
+    transition: stroke-dashoffset 1.4s cubic-bezier(0.4, 0, 0.2, 1);
+    filter: drop-shadow(0 0 6px rgba(200,169,110,0.5));
+  }
+  .score-ring-fill.red { stroke: var(--red); filter: drop-shadow(0 0 6px rgba(200,55,42,0.5)); }
+  .score-ring-fill.green { stroke: var(--success); filter: drop-shadow(0 0 6px rgba(90,158,111,0.4)); }
+
+  .score-num-inner {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .score-num {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 36px;
+    font-weight: 600;
+    color: var(--cream);
+    line-height: 1;
+  }
+  .score-num-sub {
+    font-family: 'Noto Sans SC', sans-serif;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+    margin-top: 2px;
+  }
+
+  .score-meta { flex: 1; min-width: 200px; }
+  .score-label {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 26px;
+    font-weight: 600;
+    color: var(--cream);
+    margin-bottom: 8px;
+  }
+  .score-summary-text {
+    font-size: 14px;
+    line-height: 1.9;
+    color: var(--cream-dim);
+  }
+  .essay-meta-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 14px;
+  }
+  .meta-tag {
+    font-family: 'Noto Sans SC', sans-serif;
+    font-size: 11px;
+    padding: 3px 10px;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    color: var(--text-dim);
+    letter-spacing: 0.08em;
+  }
+
+  /* Dimension Grid */
+  .dim-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+
+  .dim-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 20px;
+    transition: border-color 0.3s;
+    animation: fadeIn 0.5s ease backwards;
+  }
+  .dim-card:hover { border-color: var(--border-strong); }
+
+  .dim-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .dim-name {
+    font-size: 13px;
+    letter-spacing: 0.1em;
+    color: var(--text-dim);
+    font-family: 'Noto Sans SC', sans-serif;
+    font-weight: 400;
+  }
+  .dim-score {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--gold);
+  }
+
+  .dim-bar-track {
+    height: 3px;
+    background: var(--bg3);
+    border-radius: 99px;
+    overflow: hidden;
+    margin-bottom: 12px;
+  }
+  .dim-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--gold), #e8c47a);
+    border-radius: 99px;
+    width: 0%;
+    transition: width 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .dim-comment {
+    font-size: 13px;
+    line-height: 1.8;
+    color: var(--cream-dim);
+  }
+
+  /* Detailed Analysis */
+  .analysis-block {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 28px 32px;
+    margin-bottom: 16px;
+    animation: fadeIn 0.5s ease backwards;
+  }
+  .block-title {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--gold);
+    letter-spacing: 0.08em;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .block-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+  .block-body {
+    font-size: 14px;
+    line-height: 2;
+    color: var(--cream-dim);
+    white-space: pre-wrap;
+  }
+
+  /* Suggestions */
+  .suggestions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .suggestion-item {
+    display: flex;
+    gap: 14px;
+    padding: 14px 16px;
+    background: var(--bg3);
+    border-radius: 3px;
+    border-left: 2px solid var(--gold);
+    animation: fadeIn 0.4s ease backwards;
+  }
+  .suggestion-num {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 20px;
+    color: var(--gold);
+    line-height: 1;
+    flex-shrink: 0;
+    padding-top: 2px;
+  }
+  .suggestion-text {
+    font-size: 14px;
+    line-height: 1.8;
+    color: var(--cream-dim);
+  }
+
+  /* Thinking section */
+  .thinking-section {
+    margin-top: 24px;
+  }
+  .thinking-toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    padding: 12px 0;
+    border-top: 1px solid var(--border);
+    color: var(--text-dim);
+    font-family: 'Noto Sans SC', sans-serif;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    user-select: none;
+    transition: color 0.2s;
+  }
+  .thinking-toggle:hover { color: var(--gold-dim); }
+  .thinking-toggle svg { width: 14px; height: 14px; stroke: currentColor; fill: none; transition: transform 0.3s; }
+  .thinking-toggle.open svg { transform: rotate(180deg); }
+
+  .thinking-content {
+    display: none;
+    padding: 20px;
+    background: var(--bg3);
+    border-radius: 3px;
+    font-family: 'Noto Sans SC', sans-serif;
+    font-size: 12px;
+    line-height: 1.9;
+    color: var(--text-dim);
+    white-space: pre-wrap;
+    max-height: 300px;
+    overflow-y: auto;
+    animation: fadeIn 0.3s ease;
+  }
+  .thinking-content.open { display: block; }
+
+  /* Footer */
+  footer {
+    text-align: center;
+    padding: 60px 0 40px;
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 13px;
+    color: var(--text-dim);
+    font-style: italic;
+    opacity: 0.5;
+  }
+
+  /* ── MODAL ── */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.75);
+    backdrop-filter: blur(4px);
+    z-index: 500;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.2s ease;
+  }
+  .modal-overlay.active { display: flex; }
+
+  .modal {
+    background: var(--bg2);
+    border: 1px solid var(--border-strong);
+    border-radius: 4px;
+    padding: 40px;
+    width: 100%;
+    max-width: 480px;
+    margin: 24px;
+    position: relative;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+  }
+
+  .modal-title {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--cream);
+    letter-spacing: 0.1em;
+    margin-bottom: 28px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .modal-title svg { width: 18px; height: 18px; stroke: var(--gold); fill: none; }
+
+  .modal-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 32px;
+    height: 32px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-dim);
+    transition: all 0.2s;
+  }
+  .modal-close:hover { border-color: var(--border-strong); color: var(--text); }
+  .modal-close svg { width: 14px; height: 14px; stroke: currentColor; fill: none; }
+
+  .form-group {
+    margin-bottom: 22px;
+  }
+  .form-label {
+    display: block;
+    font-family: 'Noto Sans SC', sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    color: var(--gold-dim);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+  }
+  .form-input, .form-select {
+    width: 100%;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 11px 14px;
+    color: var(--text);
+    font-family: 'Noto Sans SC', sans-serif;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+    appearance: none;
+  }
+  .form-input:focus, .form-select:focus { border-color: var(--border-strong); }
+  .form-input::placeholder { color: var(--text-dim); }
+
+  .select-wrap {
+    position: relative;
+  }
+  .select-wrap::after {
+    content: '▾';
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--gold-dim);
+    pointer-events: none;
+    font-size: 12px;
+  }
+
+  .form-hint {
+    font-family: 'Noto Sans SC', sans-serif;
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 6px;
+    line-height: 1.6;
+  }
+
+  .btn-save {
+    width: 100%;
+    padding: 13px;
+    background: var(--red);
+    color: #fff;
+    border: none;
+    border-radius: 2px;
+    font-family: 'Noto Serif SC', serif;
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 4px;
+  }
+  .btn-save:hover { background: #d94035; box-shadow: 0 4px 20px rgba(200,55,42,0.35); }
+
+  .api-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Noto Sans SC', sans-serif;
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 12px;
+  }
+  .api-status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--border);
+  }
+  .api-status-dot.ok { background: var(--success); box-shadow: 0 0 6px rgba(90,158,111,0.5); }
+  .api-status-dot.err { background: var(--red); }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--bg3);
+    border: 1px solid var(--border-strong);
+    border-radius: 3px;
+    padding: 12px 24px;
+    font-family: 'Noto Sans SC', sans-serif;
+    font-size: 13px;
+    color: var(--text);
+    z-index: 1000;
+    transition: transform 0.3s ease;
+    white-space: nowrap;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.error { border-color: rgba(200,55,42,0.5); color: #d4776a; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
+
+  /* Responsive */
+  @media (max-width: 600px) {
+    .score-hero { flex-direction: column; align-items: flex-start; }
+    .dim-grid { grid-template-columns: 1fr; }
+    .analysis-block { padding: 20px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Settings Button -->
+<button class="settings-btn" id="settingsBtn" title="设置 / Settings">
+  <svg viewBox="0 0 24 24" stroke-width="1.5">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"/>
+    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/>
+  </svg>
+</button>
+
+<!-- Settings Modal -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <div class="modal-title">
+      <svg viewBox="0 0 24 24" stroke-width="1.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 0 1 21.75 8.25Z"/>
+      </svg>
+      配置 API 设置
+    </div>
+    <button class="modal-close" id="closeModal">
+      <svg viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
+    </button>
+
+    <div class="form-group">
+      <label class="form-label" for="apiKeyInput">DeepSeek API Key</label>
+      <input type="password" class="form-input" id="apiKeyInput" placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxx">
+      <p class="form-hint">密钥存储在本地浏览器，不会上传服务器。<br>Get your key at <a href="https://platform.deepseek.com" target="_blank" style="color:var(--gold-dim)">platform.deepseek.com</a></p>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="modelSelect">模型选择 / Model</label>
+      <div class="select-wrap">
+        <select class="form-select" id="modelSelect">
+          <option value="deepseek-v4-pro">DeepSeek V4 Pro — 旗舰推理，深度分析</option>
+          <option value="deepseek-v4-flash">DeepSeek V4 Flash — 快速响应，轻量评析</option>
+          <option value="deepseek-chat">deepseek-chat (V4 Flash 兼容)</option>
+        </select>
+      </div>
+      <p class="form-hint">V4 Pro 支持 100 万 token 上下文与深度推理，推荐用于长篇作文。</p>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="thinkingToggle">思考模式 / Thinking Mode</label>
+      <div class="select-wrap">
+        <select class="form-select" id="thinkingToggle">
+          <option value="enabled">启用 — 深度链式推理 (CoT)</option>
+          <option value="disabled">禁用 — 直接评析，速度更快</option>
+        </select>
+      </div>
+    </div>
+
+    <button class="btn-save" id="saveSettings">保存设置 / Save</button>
+
+    <div class="api-status" id="apiStatus">
+      <div class="api-status-dot" id="statusDot"></div>
+      <span id="statusText">尚未配置 API Key</span>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Main -->
+<div class="container">
+  <header>
+    <div class="header-ornament">
+      <span></span>
+      <svg viewBox="0 0 12 12"><path d="M6 0L7.5 4.5H12L8.25 7.5L9.75 12L6 9L2.25 12L3.75 7.5L0 4.5H4.5Z"/></svg>
+      <span></span>
+    </div>
+    <h1 class="site-title">AI 作文评析器<em>·</em></h1>
+    <p class="site-sub">Powered by DeepSeek V4 · Intelligent Essay Analysis Agent</p>
+  </header>
+
+  <div class="section-divider"><span>输入作文 / Input Essay</span></div>
+
+  <!-- Input Panel -->
+  <div class="input-panel" id="inputPanel">
+    <div class="input-toolbar">
+      <div class="lang-badge" id="langBadge">语言检测中…</div>
+      <div class="char-count" id="charCount">0 字</div>
+    </div>
+    <textarea
+      id="essay-input"
+      placeholder="在此输入您的中文或英文作文，支持各类文体……&#10;&#10;Paste your Chinese or English essay here. All genres welcome — narrative, expository, argumentative, creative…"
+      spellcheck="false"
+    ></textarea>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn-analyze" id="analyzeBtn">开 始 评 析</button>
+    <button class="btn-clear" id="clearBtn">清空 / Clear</button>
+  </div>
+
+  <!-- Loading -->
+  <div class="analysis-loading" id="loadingSection">
+    <div class="thinking-indicator">
+      <span>Agent 引擎运行中</span>
+      <div class="thinking-dots">
+        <span></span><span></span><span></span>
+      </div>
+    </div>
+    <div class="stage-list" id="stageList">
+      <div class="stage-item" data-stage="0">
+        <div class="stage-num">1</div>
+        <span>解析作文类型与语言</span>
+      </div>
+      <div class="stage-item" data-stage="1">
+        <div class="stage-num">2</div>
+        <span>分析结构与逻辑框架</span>
+      </div>
+      <div class="stage-item" data-stage="2">
+        <div class="stage-num">3</div>
+        <span>评估语言表达与风格</span>
+      </div>
+      <div class="stage-item" data-stage="3">
+        <div class="stage-num">4</div>
+        <span>检查内容与论点深度</span>
+      </div>
+      <div class="stage-item" data-stage="4">
+        <div class="stage-num">5</div>
+        <span>生成综合评分与建议</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div id="results">
+    <div class="section-divider"><span>评析报告 / Analysis Report</span></div>
+
+    <!-- Score Hero -->
+    <div class="score-hero" id="scoreHero">
+      <div class="score-ring-wrap">
+        <svg viewBox="0 0 120 120">
+          <circle class="score-ring-track" cx="60" cy="60" r="50"/>
+          <circle class="score-ring-fill" id="scoreRing" cx="60" cy="60" r="50"/>
+        </svg>
+        <div class="score-num-inner">
+          <div class="score-num" id="scoreNum">—</div>
+          <div class="score-num-sub">综合分</div>
+        </div>
+      </div>
+      <div class="score-meta">
+        <div class="score-label" id="scoreLabel">总体评价</div>
+        <div class="score-summary-text" id="scoreSummary"></div>
+        <div class="essay-meta-tags" id="metaTags"></div>
+      </div>
+    </div>
+
+    <!-- Dimension Cards -->
+    <div class="dim-grid" id="dimGrid"></div>
+
+    <!-- Detailed Analysis Blocks -->
+    <div id="analysisBlocks"></div>
+
+    <!-- Suggestions -->
+    <div class="analysis-block" id="suggestionsBlock" style="display:none">
+      <div class="block-title">改进建议</div>
+      <div class="suggestions-list" id="suggestionsList"></div>
+    </div>
+
+    <!-- Thinking -->
+    <div class="thinking-section" id="thinkingSection" style="display:none">
+      <div class="thinking-toggle" id="thinkingToggle">
+        <svg viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"/></svg>
+        查看 AI 推理过程 / View Thinking Process
+      </div>
+      <div class="thinking-content" id="thinkingContent"></div>
+    </div>
+
+    <div class="btn-row" style="margin-top:32px; margin-bottom:8px">
+      <button class="btn-analyze" id="reanalyzeBtn">重新评析</button>
+      <button class="btn-clear" id="backBtn">返回修改</button>
+    </div>
+  </div>
+
+  <footer>作文是思维的镜子 · Essays are mirrors of the mind</footer>
+</div>
+
+<script>
+// ─── STATE ─────────────────────────────────────────────────────────────────
+let config = {
+  apiKey: '',
+  model: 'deepseek-v4-pro',
+  thinking: 'enabled',
+};
+
+// Load from localStorage
+try {
+  const saved = JSON.parse(localStorage.getItem('essay-analyzer-config') || '{}');
+  Object.assign(config, saved);
+} catch(e) {}
+
+// ─── ELEMENTS ──────────────────────────────────────────────────────────────
+const essayInput   = document.getElementById('essay-input');
+const langBadge    = document.getElementById('langBadge');
+const charCount    = document.getElementById('charCount');
+const analyzeBtn   = document.getElementById('analyzeBtn');
+const clearBtn     = document.getElementById('clearBtn');
+const loadingSec   = document.getElementById('loadingSection');
+const resultsSec   = document.getElementById('results');
+const settingsBtn  = document.getElementById('settingsBtn');
+const settingsModal= document.getElementById('settingsModal');
+const closeModal   = document.getElementById('closeModal');
+const apiKeyInput  = document.getElementById('apiKeyInput');
+const modelSelect  = document.getElementById('modelSelect');
+const thinkingToggle = document.getElementById('thinkingToggle');
+const saveSettings = document.getElementById('saveSettings');
+const statusDot    = document.getElementById('statusDot');
+const statusText   = document.getElementById('statusText');
+const toast        = document.getElementById('toast');
+const stageList    = document.getElementById('stageList');
+const reanalyzeBtn = document.getElementById('reanalyzeBtn');
+const backBtn      = document.getElementById('backBtn');
+
+// ─── MODAL ─────────────────────────────────────────────────────────────────
+function openSettings() {
+  apiKeyInput.value = config.apiKey;
+  modelSelect.value = config.model;
+  thinkingToggle.value = config.thinking;
+  updateApiStatus();
+  settingsModal.classList.add('active');
+}
+function closeSettings() { settingsModal.classList.remove('active'); }
+
+settingsBtn.addEventListener('click', openSettings);
+closeModal.addEventListener('click', closeSettings);
+settingsModal.addEventListener('click', e => { if(e.target === settingsModal) closeSettings(); });
+
+saveSettings.addEventListener('click', () => {
+  config.apiKey = apiKeyInput.value.trim();
+  config.model  = modelSelect.value;
+  config.thinking = thinkingToggle.value;
+  localStorage.setItem('essay-analyzer-config', JSON.stringify(config));
+  updateApiStatus();
+  showToast('设置已保存 ✓');
+  setTimeout(closeSettings, 800);
+});
+
+function updateApiStatus() {
+  if (config.apiKey) {
+    statusDot.className = 'api-status-dot ok';
+    statusText.textContent = `已配置 · ${config.model}`;
+  } else {
+    statusDot.className = 'api-status-dot';
+    statusText.textContent = '尚未配置 API Key';
+  }
+}
+updateApiStatus();
+
+// ─── TOAST ─────────────────────────────────────────────────────────────────
+function showToast(msg, isError = false) {
+  toast.textContent = msg;
+  toast.className = 'toast' + (isError ? ' error' : '');
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+// ─── LANGUAGE DETECTION ────────────────────────────────────────────────────
+function detectLang(text) {
+  const cn = (text.match(/[\u4e00-\u9fff]/g) || []).length;
+  const total = text.replace(/\s/g, '').length;
+  if (!total) return 'unknown';
+  return (cn / total > 0.2) ? 'cn' : 'en';
+}
+
+essayInput.addEventListener('input', () => {
+  const text = essayInput.value;
+  const len = text.length;
+  charCount.textContent = len > 0 ? `${len} 字符` : '0 字';
+  const lang = detectLang(text);
+  if (lang === 'cn') {
+    langBadge.textContent = '中文作文';
+    langBadge.className = 'lang-badge cn';
+  } else if (lang === 'en') {
+    langBadge.textContent = 'English Essay';
+    langBadge.className = 'lang-badge en';
+  } else {
+    langBadge.textContent = '语言检测中…';
+    langBadge.className = 'lang-badge';
+  }
+});
+
+clearBtn.addEventListener('click', () => {
+  essayInput.value = '';
+  essayInput.dispatchEvent(new Event('input'));
+  resultsSec.classList.remove('active');
+  loadingSec.classList.remove('active');
+  analyzeBtn.disabled = false;
+});
+
+backBtn.addEventListener('click', () => {
+  resultsSec.classList.remove('active');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+
+reanalyzeBtn.addEventListener('click', () => {
+  resultsSec.classList.remove('active');
+  startAnalysis();
+});
+
+// ─── STAGE PROGRESS ────────────────────────────────────────────────────────
+const stages = document.querySelectorAll('.stage-item');
+let stageTimers = [];
+
+function clearStages() {
+  stageTimers.forEach(clearTimeout);
+  stageTimers = [];
+  stages.forEach(s => {
+    s.classList.remove('active', 'done');
+    const ic = s.querySelector('.stage-icon');
+    if (ic) ic.remove();
+    const num = s.querySelector('.stage-num');
+    if (num) num.style.display = '';
+  });
+}
+
+function animateStages() {
+  clearStages();
+  const delays = [0, 1200, 2600, 4200, 6000];
+  stages.forEach((s, i) => {
+    const t1 = setTimeout(() => {
+      stages.forEach((ss, ii) => { if (ii < i) markStageDone(ss); });
+      s.classList.add('active');
+    }, delays[i]);
+    stageTimers.push(t1);
+  });
+}
+
+function markStageDone(el) {
+  el.classList.remove('active');
+  el.classList.add('done');
+  const num = el.querySelector('.stage-num');
+  if (num) { num.textContent = '✓'; }
+}
+
+function finishAllStages() {
+  stageTimers.forEach(clearTimeout);
+  stages.forEach(s => markStageDone(s));
+}
+
+// ─── ANALYSIS ──────────────────────────────────────────────────────────────
+analyzeBtn.addEventListener('click', () => {
+  if (!essayInput.value.trim()) {
+    showToast('请先输入作文内容', true);
+    return;
+  }
+  startAnalysis();
+});
+
+async function startAnalysis() {
+  if (!config.apiKey) {
+    showToast('请先在设置中填写 API Key', true);
+    openSettings();
+    return;
+  }
+
+  const essay = essayInput.value.trim();
+  const lang = detectLang(essay);
+  const isZh = lang === 'cn';
+
+  // Show loading
+  loadingSec.classList.add('active');
+  resultsSec.classList.remove('active');
+  analyzeBtn.disabled = true;
+  window.scrollTo({ top: loadingSec.offsetTop - 80, behavior: 'smooth' });
+  animateStages();
+
+  const systemPrompt = `你是一位顶级的作文评析专家，融合了语文名师、英语写作导师和资深编辑的智慧。你对中英文写作均有深刻理解，能够精准识别作文的优点和不足，并提出具体、可操作的改进建议。
+
+你的评析必须：
+1. 专业深入，有独到见解，不流于表面
+2. 语言温和而不失严谨，鼓励与批评并重
+3. 结合具体段落或句子举例分析
+4. 输出格式严格遵循 JSON
+
+请用 JSON 格式返回评析结果，结构如下：
+{
+  "lang": "zh" 或 "en",
+  "essay_type": "记叙文/议论文/说明文/散文/Argumentative/Narrative/Expository/Descriptive/等",
+  "overall_score": 85,
+  "score_label": "优秀/良好/一般/需改进 或 Excellent/Good/Fair/Needs Work",
+  "summary": "总体评语（100-150字），对作文作整体性评价",
+  "word_count": 实际字数,
+  "dimensions": [
+    { "name": "结构布局", "en_name": "Structure", "score": 85, "comment": "具体评语（50-80字）" },
+    { "name": "语言表达", "en_name": "Language", "score": 88, "comment": "具体评语（50-80字）" },
+    { "name": "内容立意", "en_name": "Content", "score": 82, "comment": "具体评语（50-80字）" },
+    { "name": "逻辑论证", "en_name": "Logic", "score": 80, "comment": "具体评语（50-80字）" },
+    { "name": "文采风格", "en_name": "Style", "score": 87, "comment": "具体评语（50-80字）" },
+    { "name": "规范准确", "en_name": "Accuracy", "score": 90, "comment": "具体评语（50-80字）" }
+  ],
+  "detailed_analysis": {
+    "strengths": "闪光点分析（150-200字）：具体指出作文的1-3个突出优点，引用原文",
+    "weaknesses": "不足之处（150-200字）：具体指出2-3个需要改进的地方，结合具体段落",
+    "language_highlights": "语言亮点（100-150字）：摘录并点评优秀的词句表达",
+    "structure_analysis": "结构分析（100-150字）：分析文章的谋篇布局"
+  },
+  "suggestions": [
+    "具体改进建议1（30-50字，可操作）",
+    "具体改进建议2",
+    "具体改进建议3",
+    "具体改进建议4",
+    "具体改进建议5"
+  ]
+}
+
+注意：只返回 JSON，不要有任何其他文字或 markdown 标记。`;
+
+  const userPrompt = `请评析以下${isZh ? '中文' : '英文'}作文：\n\n${essay}`;
+
+  const body = {
+    model: config.model,
+    max_tokens: 4096,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt }
+    ],
+    stream: false,
+  };
+
+  if (config.thinking === 'enabled') {
+    body.thinking = { type: 'enabled' };
+    body.reasoning_effort = 'high';
+  }
+
+  try {
+    const res = await fetch('https://api.deepseek.com/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.apiKey}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || `HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    finishAllStages();
+
+    // Extract thinking
+    let thinkingText = '';
+    let content = '';
+
+    const msg = data.choices?.[0]?.message;
+    if (!msg) throw new Error('Invalid API response');
+
+    // Handle content blocks (thinking mode)
+    if (Array.isArray(msg.content)) {
+      for (const block of msg.content) {
+        if (block.type === 'thinking') thinkingText += block.thinking || '';
+        if (block.type === 'text') content += block.text || '';
+      }
+    } else {
+      content = msg.content || '';
+      thinkingText = msg.reasoning_content || '';
+    }
+
+    // Parse JSON
+    const jsonStr = content.replace(/```json\s*/g,'').replace(/```\s*/g,'').trim();
+    let parsed;
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch(e) {
+      // Try to extract JSON from response
+      const match = jsonStr.match(/\{[\s\S]*\}/);
+      if (!match) throw new Error('无法解析评析结果，请重试');
+      parsed = JSON.parse(match[0]);
+    }
+
+    await showResults(parsed, thinkingText, essay);
+
+  } catch (err) {
+    loadingSec.classList.remove('active');
+    analyzeBtn.disabled = false;
+    showToast(`评析失败：${err.message}`, true);
+    clearStages();
+  }
+}
+
+// ─── RENDER RESULTS ────────────────────────────────────────────────────────
+async function showResults(data, thinkingText, originalEssay) {
+  // Delay briefly so stage animation finishes
+  await new Promise(r => setTimeout(r, 600));
+  loadingSec.classList.remove('active');
+
+  // Score ring
+  const score = Math.min(100, Math.max(0, data.overall_score || 0));
+  const scoreNum = document.getElementById('scoreNum');
+  const scoreRing = document.getElementById('scoreRing');
+  const scoreSummary = document.getElementById('scoreSummary');
+  const scoreLabel = document.getElementById('scoreLabel');
+  const metaTags = document.getElementById('metaTags');
+
+  scoreNum.textContent = score;
+  scoreLabel.textContent = data.score_label || '综合评价';
+  scoreSummary.textContent = data.summary || '';
+
+  // Color ring by score
+  if (score >= 80) scoreRing.classList.add('green');
+  else if (score < 60) scoreRing.classList.add('red');
+
+  // Animate ring: circumference = 2π×50 ≈ 314
+  const offset = 314 - (314 * score / 100);
+  setTimeout(() => { scoreRing.style.strokeDashoffset = offset; }, 100);
+
+  // Meta tags
+  metaTags.innerHTML = '';
+  const tags = [
+    data.essay_type,
+    data.lang === 'zh' ? '中文' : 'English',
+    data.word_count ? `${data.word_count} 字` : null,
+  ].filter(Boolean);
+  tags.forEach(t => {
+    const el = document.createElement('span');
+    el.className = 'meta-tag';
+    el.textContent = t;
+    metaTags.appendChild(el);
+  });
+
+  // Dimension cards
+  const dimGrid = document.getElementById('dimGrid');
+  dimGrid.innerHTML = '';
+  (data.dimensions || []).forEach((dim, i) => {
+    const card = document.createElement('div');
+    card.className = 'dim-card';
+    card.style.animationDelay = `${i * 0.08}s`;
+    const s = Math.min(100, dim.score || 0);
+    card.innerHTML = `
+      <div class="dim-header">
+        <span class="dim-name">${dim.name} <span style="opacity:0.5;font-size:11px">/ ${dim.en_name}</span></span>
+        <span class="dim-score">${s}</span>
+      </div>
+      <div class="dim-bar-track"><div class="dim-bar-fill" data-width="${s}"></div></div>
+      <div class="dim-comment">${dim.comment || ''}</div>
+    `;
+    dimGrid.appendChild(card);
+  });
+  // Animate bars after render
+  setTimeout(() => {
+    document.querySelectorAll('.dim-bar-fill').forEach(b => {
+      b.style.width = b.dataset.width + '%';
+    });
+  }, 200);
+
+  // Detailed blocks
+  const blocksContainer = document.getElementById('analysisBlocks');
+  blocksContainer.innerHTML = '';
+  const det = data.detailed_analysis || {};
+  const blockDefs = [
+    { title: '闪光点 · Strengths', key: 'strengths' },
+    { title: '结构分析 · Structure', key: 'structure_analysis' },
+    { title: '语言亮点 · Language Highlights', key: 'language_highlights' },
+    { title: '待改进之处 · Areas for Improvement', key: 'weaknesses' },
+  ];
+  blockDefs.forEach((def, i) => {
+    if (!det[def.key]) return;
+    const block = document.createElement('div');
+    block.className = 'analysis-block';
+    block.style.animationDelay = `${i * 0.1}s`;
+    block.innerHTML = `<div class="block-title">${def.title}</div><div class="block-body">${det[def.key]}</div>`;
+    blocksContainer.appendChild(block);
+  });
+
+  // Suggestions
+  const suggs = data.suggestions || [];
+  const sugBlock = document.getElementById('suggestionsBlock');
+  const sugList  = document.getElementById('suggestionsList');
+  if (suggs.length) {
+    sugList.innerHTML = '';
+    suggs.forEach((s, i) => {
+      const item = document.createElement('div');
+      item.className = 'suggestion-item';
+      item.style.animationDelay = `${i * 0.08}s`;
+      item.innerHTML = `<div class="suggestion-num">${i+1}</div><div class="suggestion-text">${s}</div>`;
+      sugList.appendChild(item);
+    });
+    sugBlock.style.display = 'block';
+  } else {
+    sugBlock.style.display = 'none';
+  }
+
+  // Thinking
+  const thinkingSec = document.getElementById('thinkingSection');
+  const thinkingContent = document.getElementById('thinkingContent');
+  const thinkingToggleBtn = document.getElementById('thinkingToggle');
+
+  if (thinkingText && thinkingText.trim()) {
+    thinkingContent.textContent = thinkingText;
+    thinkingSec.style.display = 'block';
+    thinkingToggleBtn.addEventListener('click', () => {
+      thinkingToggleBtn.classList.toggle('open');
+      thinkingContent.classList.toggle('open');
+    });
+  } else {
+    thinkingSec.style.display = 'none';
+  }
+
+  // Show results
+  resultsSec.classList.add('active');
+  analyzeBtn.disabled = false;
+
+  setTimeout(() => {
+    window.scrollTo({ top: resultsSec.offsetTop - 80, behavior: 'smooth' });
+  }, 100);
+}
+
+// ─── INIT ──────────────────────────────────────────────────────────────────
+// Prompt open settings if no API key
+if (!config.apiKey) {
+  setTimeout(() => {
+    showToast('请先配置 DeepSeek API Key，点击右上角 ⚙️ 图标');
+  }, 1200);
+}
+
+// Initial lang state
+langBadge.textContent = '语言检测中…';
+langBadge.className = 'lang-badge';
+</script>
+</body>
+</html>
