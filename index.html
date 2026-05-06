@@ -3,1441 +3,969 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI 作文评析器</title>
+<title>文鉴 · AI 作文评析引擎</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;500;600;700&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Noto+Sans+SC:wght@300;400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Noto+Serif+SC:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500&family=DM+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --bg: #0c0b09;
-    --bg2: #141210;
-    --bg3: #1c1916;
-    --border: rgba(200,169,110,0.15);
-    --border-strong: rgba(200,169,110,0.35);
-    --red: #c8372a;
-    --red-glow: rgba(200,55,42,0.25);
-    --gold: #c8a96e;
-    --gold-dim: rgba(200,169,110,0.5);
-    --cream: #f0ebe0;
-    --cream-dim: rgba(240,235,224,0.6);
-    --cream-faint: rgba(240,235,224,0.15);
-    --text: #e8e0d0;
-    --text-dim: rgba(232,224,208,0.55);
-    --success: #5a9e6f;
-    --warn: #c8a96e;
-  }
+:root {
+  --bg:      #f0ece5;
+  --surface: #ffffff;
+  --surface2:#faf8f5;
+  --border:  #e4dfd7;
+  --border2: #cec8bf;
+  --text:    #1c1814;
+  --text2:   #6b6460;
+  --text3:   #a09890;
+  --c-dispatch:  #4f46e5;
+  --c-evaluator: #0d7377;
+  --c-structure: #2d7d46;
+  --c-language:  #b45309;
+  --c-ideas:     #7c3aed;
+  --c-aidet:     #be185d;
+  --c-coach:     #1d4ed8;
+  --c-emotion:   #9d174d;
+  --c-allusion:  #92400e;
+  --c-errors:    #991b1b;
+  --radius: 8px;
+  --shadow: 0 1px 3px rgba(0,0,0,.06), 0 4px 16px rgba(0,0,0,.05);
+  --shadow-lg: 0 4px 12px rgba(0,0,0,.09), 0 16px 48px rgba(0,0,0,.09);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{font-size:16px;scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:'Noto Sans SC',sans-serif;min-height:100vh}
+button{font-family:inherit;cursor:pointer}
 
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* ── TOPBAR ── */
+.topbar{
+  position:sticky;top:0;z-index:200;
+  background:rgba(240,236,229,.9);
+  backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 28px;height:54px;
+}
+.brand{display:flex;align-items:baseline;gap:10px}
+.brand-name{font-family:'DM Serif Display','Noto Serif SC',serif;font-size:20px;color:var(--text);letter-spacing:.01em}
+.brand-sub{font-size:10px;color:var(--text3);letter-spacing:.14em;text-transform:uppercase;font-family:'DM Mono',monospace}
+.btn-icon{
+  width:34px;height:34px;border:1px solid var(--border);background:var(--surface);
+  border-radius:var(--radius);display:flex;align-items:center;justify-content:center;
+  color:var(--text2);transition:all .15s;
+}
+.btn-icon:hover{border-color:var(--border2);color:var(--text);box-shadow:var(--shadow)}
+.btn-icon svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8}
 
-  html { font-size: 16px; scroll-behavior: smooth; }
+/* ── LAYOUT ── */
+.page{max-width:860px;margin:0 auto;padding:0 24px}
+.page-wide{max-width:1260px;margin:0 auto;padding:0 28px}
 
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Noto Serif SC', serif;
-    min-height: 100vh;
-    overflow-x: hidden;
-    position: relative;
-  }
+/* ══ INPUT SCREEN ══ */
+#inputScreen{padding:64px 0 100px}
+.input-hero{text-align:center;margin-bottom:44px}
+.input-hero h2{
+  font-family:'DM Serif Display','Noto Serif SC',serif;
+  font-size:clamp(30px,5.5vw,50px);font-weight:400;
+  line-height:1.18;letter-spacing:-.01em;
+}
+.input-hero h2 em{font-style:italic;color:var(--c-dispatch)}
+.input-hero p{margin-top:14px;font-family:'DM Serif Display',serif;font-style:italic;font-size:15px;color:var(--text3)}
 
-  /* Grain texture */
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
-    pointer-events: none;
-    z-index: 0;
-    opacity: 0.6;
-  }
+.input-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;
+}
+.input-toolbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 16px;background:var(--surface2);border-bottom:1px solid var(--border);
+}
+.lang-pill{
+  font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+  padding:3px 10px;border-radius:99px;border:1px solid var(--border);
+  color:var(--text3);transition:all .25s;font-family:'DM Mono',monospace;
+}
+.lang-pill.zh{border-color:#be185d44;color:#be185d;background:#be185d08}
+.lang-pill.en{border-color:#2d7d4644;color:#2d7d46;background:#2d7d4608}
+.char-count{font-family:'DM Mono',monospace;font-size:12px;color:var(--text3)}
+#essayInput{
+  width:100%;min-height:340px;background:none;border:none;outline:none;resize:vertical;
+  padding:26px;font-family:'Noto Serif SC',serif;font-size:15px;line-height:2.1;color:var(--text);
+  caret-color:var(--c-dispatch);
+}
+#essayInput::placeholder{color:var(--text3);font-family:'DM Serif Display',serif;font-style:italic;font-size:16px}
 
-  /* Ambient red glow top */
-  body::after {
-    content: '';
-    position: fixed;
-    top: -200px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 700px;
-    height: 400px;
-    background: radial-gradient(ellipse, rgba(180,40,30,0.08) 0%, transparent 70%);
-    pointer-events: none;
-    z-index: 0;
-  }
+.action-row{display:flex;gap:12px;align-items:center;margin-top:24px;justify-content:center;flex-wrap:wrap}
+.btn-primary{
+  padding:13px 36px;background:var(--text);color:#fff;border:none;border-radius:var(--radius);
+  font-size:14px;font-weight:500;letter-spacing:.07em;font-family:'Noto Sans SC',sans-serif;
+  transition:all .2s;display:flex;align-items:center;gap:8px;
+}
+.btn-primary:hover{background:#2c2420;transform:translateY(-1px);box-shadow:var(--shadow-lg)}
+.btn-primary:active{transform:none}
+.btn-primary:disabled{opacity:.4;pointer-events:none}
+.btn-primary svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2.2}
+.btn-ghost{
+  padding:13px 20px;background:none;border:1px solid var(--border);border-radius:var(--radius);
+  font-size:13px;color:var(--text2);letter-spacing:.04em;transition:all .15s;
+}
+.btn-ghost:hover{border-color:var(--border2);color:var(--text)}
 
-  .container {
-    max-width: 860px;
-    margin: 0 auto;
-    padding: 0 24px;
-    position: relative;
-    z-index: 1;
-  }
+/* Agent preview grid */
+.preview-label{
+  margin-top:52px;margin-bottom:14px;
+  font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--text3);
+  font-family:'DM Mono',monospace;text-align:center;
+}
+.agents-preview{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:8px;
+}
+.preview-chip{
+  background:var(--surface);border:1px solid var(--border);
+  border-left:3px solid;border-radius:var(--radius);
+  padding:11px 13px;display:flex;align-items:center;gap:10px;
+  font-size:12px;color:var(--text2);transition:box-shadow .15s;
+}
+.preview-chip:hover{box-shadow:var(--shadow)}
+.preview-chip-emoji{font-size:15px;flex-shrink:0}
+.preview-chip-name{font-size:12px;font-weight:500;color:var(--text)}
+.preview-chip-type{font-size:10px;color:var(--text3);margin-top:1px;font-family:'DM Mono',monospace}
 
-  /* ── HEADER ── */
-  header {
-    padding: 48px 0 0;
-    text-align: center;
-    position: relative;
-  }
+/* ══ DASHBOARD ══ */
+#dashboardScreen{display:none;padding:28px 0 80px}
 
-  .header-ornament {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 16px;
-    margin-bottom: 20px;
-    opacity: 0.45;
-  }
-  .header-ornament span {
-    height: 1px;
-    width: 80px;
-    background: linear-gradient(90deg, transparent, var(--gold));
-  }
-  .header-ornament span:last-child {
-    background: linear-gradient(90deg, var(--gold), transparent);
-  }
-  .header-ornament svg { width: 12px; height: 12px; fill: var(--gold); }
+.dash-topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:20px;flex-wrap:wrap;gap:12px;
+}
+.dash-title{font-family:'DM Serif Display','Noto Serif SC',serif;font-size:20px;font-weight:400;color:var(--text)}
+.dash-right{display:flex;gap:20px;align-items:center}
+.stat-badge{text-align:center}
+.stat-num{font-family:'DM Mono',monospace;font-size:18px;font-weight:500}
+.stat-lbl{font-size:10px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-top:1px}
 
-  .site-title {
-    font-family: 'Noto Serif SC', serif;
-    font-size: clamp(26px, 5vw, 42px);
-    font-weight: 600;
-    letter-spacing: 0.12em;
-    color: var(--cream);
-    line-height: 1.2;
-    position: relative;
-  }
-  .site-title em {
-    font-style: normal;
-    color: var(--gold);
-  }
+.progress-track{height:2px;background:var(--border);border-radius:99px;overflow:hidden;margin-bottom:28px}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--c-dispatch),#a78bfa);border-radius:99px;width:0%;transition:width .5s ease}
 
-  .site-sub {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 14px;
-    font-style: italic;
-    color: var(--text-dim);
-    letter-spacing: 0.08em;
-    margin-top: 8px;
-  }
+/* Dispatcher */
+.section-label{
+  font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--text3);
+  font-family:'DM Mono',monospace;margin-bottom:10px;
+  display:flex;align-items:center;gap:10px;
+}
+.section-label::after{content:'';flex:1;height:1px;background:var(--border)}
 
-  .settings-btn {
-    position: fixed;
-    top: 24px;
-    right: 24px;
-    width: 40px;
-    height: 40px;
-    border: 1px solid var(--border-strong);
-    background: var(--bg3);
-    border-radius: 50%;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s;
-    z-index: 100;
-    color: var(--gold-dim);
-  }
-  .settings-btn:hover {
-    border-color: var(--gold);
-    color: var(--gold);
-    box-shadow: 0 0 16px rgba(200,169,110,0.2);
-  }
-  .settings-btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; }
+.dispatch-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-left:4px solid var(--c-dispatch);
+  border-radius:var(--radius);box-shadow:var(--shadow);
+  overflow:hidden;margin-bottom:24px;
+}
+.dispatch-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:11px 16px;background:#4f46e508;border-bottom:1px solid var(--border);
+}
+.dispatch-head-title{
+  display:flex;align-items:center;gap:8px;
+  font-size:13px;font-weight:500;color:var(--c-dispatch);
+}
+.badge-pill{
+  font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.06em;
+  padding:2px 8px;border-radius:99px;background:var(--c-dispatch);color:#fff;
+}
+.dispatch-body{
+  padding:14px 18px;font-family:'DM Mono',monospace;font-size:12px;
+  line-height:1.85;color:var(--text2);min-height:52px;white-space:pre-wrap;
+}
 
-  /* ── DIVIDER ── */
-  .section-divider {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin: 40px 0 32px;
-  }
-  .section-divider::before, .section-divider::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: var(--border);
-  }
-  .section-divider span {
-    color: var(--gold-dim);
-    font-size: 11px;
-    letter-spacing: 0.25em;
-    text-transform: uppercase;
-    font-family: 'Noto Sans SC', sans-serif;
-    font-weight: 300;
-  }
+/* Agent panels */
+.agents-grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));
+  gap:14px;margin-bottom:24px;
+}
+.agent-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-top:3px solid;border-radius:var(--radius);
+  box-shadow:var(--shadow);overflow:hidden;
+  display:flex;flex-direction:column;min-height:210px;
+  transition:box-shadow .2s;
+  --ac:var(--border);
+}
+.agent-card:hover{box-shadow:var(--shadow-lg)}
+.agent-card-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 14px;border-bottom:1px solid var(--border);
+}
+.agent-head-left{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:500;color:var(--ac)}
+.agent-head-left .emoji{font-size:15px}
+.agent-head-left .en-name{font-size:10px;font-family:'DM Mono',monospace;opacity:.5;margin-left:2px}
+.agent-status{display:flex;align-items:center;gap:6px;font-family:'DM Mono',monospace;font-size:10px;color:var(--text3)}
+.sdot{width:7px;height:7px;border-radius:50%;background:var(--border);transition:all .3s;flex-shrink:0}
+.sdot.running{background:var(--ac);animation:sdot-pulse 1s ease-in-out infinite}
+.sdot.done{background:#22c55e;animation:none}
+.sdot.error{background:#ef4444;animation:none}
+@keyframes sdot-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.75)}}
 
-  /* ── INPUT AREA ── */
-  .input-panel {
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    overflow: hidden;
-    transition: border-color 0.3s, box-shadow 0.3s;
-    position: relative;
-  }
-  .input-panel:focus-within {
-    border-color: var(--border-strong);
-    box-shadow: 0 0 0 1px rgba(200,169,110,0.08), 0 8px 40px rgba(0,0,0,0.4);
-  }
+.agent-body{
+  flex:1;padding:14px 16px;font-size:13px;line-height:1.88;color:var(--text2);
+  overflow-y:auto;max-height:280px;white-space:pre-wrap;word-break:break-word;
+}
+.agent-body::-webkit-scrollbar{width:3px}
+.agent-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:99px}
 
-  .input-toolbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 16px;
-    border-bottom: 1px solid var(--border);
-    background: var(--bg3);
-  }
+.agent-foot{
+  padding:7px 14px;border-top:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--surface2);
+}
+.token-count{font-family:'DM Mono',monospace;font-size:10px;color:var(--text3)}
 
-  .lang-badge {
-    font-family: 'Noto Sans SC', sans-serif;
-    font-size: 11px;
-    letter-spacing: 0.1em;
-    padding: 3px 10px;
-    border-radius: 2px;
-    border: 1px solid var(--border);
-    color: var(--text-dim);
-    transition: all 0.3s;
-  }
-  .lang-badge.cn { border-color: rgba(200,55,42,0.4); color: #d4776a; }
-  .lang-badge.en { border-color: rgba(90,158,111,0.4); color: #7ab894; }
+.waiting-state{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  height:100%;gap:8px;padding:20px;opacity:.35;
+}
+.waiting-dots{display:flex;gap:5px}
+.waiting-dots span{
+  width:5px;height:5px;border-radius:50%;background:var(--text3);
+  animation:wdot 1.4s ease-in-out infinite;
+}
+.waiting-dots span:nth-child(2){animation-delay:.2s}
+.waiting-dots span:nth-child(3){animation-delay:.4s}
+@keyframes wdot{0%,80%,100%{transform:scale(.55);opacity:.35}40%{transform:scale(1);opacity:1}}
 
-  .char-count {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 13px;
-    color: var(--text-dim);
-  }
+/* Cursor */
+.typing::after{content:'▋';animation:blink .7s step-end infinite;color:var(--ac);font-size:.85em}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
 
-  #essay-input {
-    width: 100%;
-    min-height: 320px;
-    max-height: 600px;
-    background: transparent;
-    border: none;
-    outline: none;
-    color: var(--text);
-    font-family: 'Noto Serif SC', serif;
-    font-size: 15px;
-    line-height: 2;
-    padding: 24px;
-    resize: vertical;
-    caret-color: var(--gold);
-  }
-  #essay-input::placeholder {
-    color: var(--text-dim);
-    font-style: italic;
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 16px;
-  }
+/* ══ MODAL ══ */
+.overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.38);
+  backdrop-filter:blur(6px);z-index:500;
+  display:none;align-items:center;justify-content:center;
+}
+.overlay.open{display:flex;animation:mo .2s ease}
+@keyframes mo{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
+.modal{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:12px;width:100%;max-width:456px;margin:20px;
+  box-shadow:var(--shadow-lg);overflow:hidden;
+}
+.modal-head{
+  padding:20px 24px 16px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.modal-head h3{font-family:'DM Serif Display',serif;font-size:18px;font-weight:400}
+.modal-x{
+  width:28px;height:28px;border:1px solid var(--border);background:none;
+  border-radius:50%;display:flex;align-items:center;justify-content:center;
+  color:var(--text2);transition:all .15s;
+}
+.modal-x:hover{border-color:var(--border2);color:var(--text)}
+.modal-x svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2}
+.modal-body{padding:20px 24px 24px;display:flex;flex-direction:column;gap:16px}
+.field label{display:block;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--text3);margin-bottom:6px;font-family:'DM Mono',monospace}
+.field input,.field select{
+  width:100%;background:var(--surface2);border:1px solid var(--border);
+  border-radius:var(--radius);padding:10px 12px;font-size:13px;color:var(--text);
+  font-family:'DM Mono',monospace;outline:none;transition:border-color .15s;appearance:none;
+}
+.field input:focus,.field select:focus{border-color:var(--c-dispatch)}
+.field input::placeholder{color:var(--text3)}
+.field .hint{margin-top:5px;font-size:11px;color:var(--text3);line-height:1.5}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.key-wrap{position:relative}
+.key-wrap input{padding-right:36px}
+.eye-btn{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text3)}
+.eye-btn svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.8}
+.status-bar{
+  display:flex;align-items:center;gap:8px;padding:9px 12px;
+  background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);
+  font-size:12px;color:var(--text2);
+}
+.sindic{width:7px;height:7px;border-radius:50%;background:var(--border2);flex-shrink:0}
+.sindic.ok{background:#22c55e;box-shadow:0 0 6px #22c55e66}
+.btn-save{
+  width:100%;padding:11px;background:var(--text);color:#fff;border:none;
+  border-radius:var(--radius);font-size:13px;font-weight:500;letter-spacing:.06em;transition:all .2s;
+}
+.btn-save:hover{background:#2c2420;box-shadow:var(--shadow-lg)}
 
-  /* ── BUTTONS ── */
-  .btn-row {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 16px;
-    margin-top: 24px;
-    flex-wrap: wrap;
-  }
+/* ── TOAST ── */
+.toast{
+  position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(60px);
+  background:var(--text);color:#fff;padding:9px 20px;border-radius:var(--radius);
+  font-size:13px;z-index:9999;transition:transform .3s ease;white-space:nowrap;box-shadow:var(--shadow-lg);
+}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.toast.warn{background:#c0392b}
 
-  .btn-analyze {
-    position: relative;
-    padding: 14px 48px;
-    background: var(--red);
-    color: #fff;
-    border: none;
-    border-radius: 2px;
-    font-family: 'Noto Serif SC', serif;
-    font-size: 15px;
-    font-weight: 500;
-    letter-spacing: 0.18em;
-    cursor: pointer;
-    transition: all 0.25s;
-    overflow: hidden;
-  }
-  .btn-analyze::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 50%);
-    opacity: 0;
-    transition: opacity 0.25s;
-  }
-  .btn-analyze:hover::before { opacity: 1; }
-  .btn-analyze:hover {
-    background: #d94035;
-    box-shadow: 0 4px 24px rgba(200,55,42,0.4), 0 0 0 1px rgba(200,55,42,0.3);
-    transform: translateY(-1px);
-  }
-  .btn-analyze:active { transform: translateY(0); }
-  .btn-analyze:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    transform: none;
-    box-shadow: none;
-  }
-
-  .btn-clear {
-    padding: 14px 24px;
-    background: transparent;
-    color: var(--text-dim);
-    border: 1px solid var(--border);
-    border-radius: 2px;
-    font-family: 'Noto Sans SC', sans-serif;
-    font-size: 13px;
-    letter-spacing: 0.1em;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-  .btn-clear:hover {
-    border-color: var(--border-strong);
-    color: var(--text);
-  }
-
-  /* ── LOADING ── */
-  .analysis-loading {
-    display: none;
-    text-align: center;
-    padding: 48px 24px;
-    animation: fadeIn 0.4s ease;
-  }
-  .analysis-loading.active { display: block; }
-
-  .thinking-indicator {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 16px;
-    font-style: italic;
-    color: var(--gold-dim);
-    margin-bottom: 24px;
-  }
-  .thinking-dots span {
-    display: inline-block;
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    background: var(--gold);
-    animation: dot-pulse 1.4s ease-in-out infinite;
-  }
-  .thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
-  .thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
-
-  @keyframes dot-pulse {
-    0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
-    40% { transform: scale(1); opacity: 1; }
-  }
-
-  .stage-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    max-width: 340px;
-    margin: 0 auto;
-    text-align: left;
-  }
-
-  .stage-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 16px;
-    border-radius: 3px;
-    font-family: 'Noto Sans SC', sans-serif;
-    font-size: 13px;
-    color: var(--text-dim);
-    background: transparent;
-    transition: all 0.4s;
-    letter-spacing: 0.05em;
-  }
-  .stage-item.active {
-    background: var(--bg3);
-    color: var(--cream);
-    border-left: 2px solid var(--gold);
-  }
-  .stage-item.done {
-    color: var(--success);
-  }
-  .stage-item.done .stage-icon { color: var(--success); }
-  .stage-item .stage-icon { width: 16px; flex-shrink: 0; text-align: center; }
-  .stage-item .stage-num {
-    width: 18px;
-    height: 18px;
-    border: 1px solid currentColor;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 10px;
-    flex-shrink: 0;
-  }
-
-  /* ── RESULTS ── */
-  #results {
-    display: none;
-    animation: fadeIn 0.6s ease;
-  }
-  #results.active { display: block; }
-
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(12px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  /* Score Hero */
-  .score-hero {
-    display: flex;
-    align-items: center;
-    gap: 32px;
-    padding: 32px;
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    margin-bottom: 24px;
-    flex-wrap: wrap;
-  }
-
-  .score-ring-wrap {
-    position: relative;
-    flex-shrink: 0;
-  }
-  .score-ring-wrap svg { width: 120px; height: 120px; transform: rotate(-90deg); }
-  .score-ring-track { fill: none; stroke: var(--bg3); stroke-width: 6; }
-  .score-ring-fill {
-    fill: none;
-    stroke: var(--gold);
-    stroke-width: 6;
-    stroke-linecap: round;
-    stroke-dasharray: 314;
-    stroke-dashoffset: 314;
-    transition: stroke-dashoffset 1.4s cubic-bezier(0.4, 0, 0.2, 1);
-    filter: drop-shadow(0 0 6px rgba(200,169,110,0.5));
-  }
-  .score-ring-fill.red { stroke: var(--red); filter: drop-shadow(0 0 6px rgba(200,55,42,0.5)); }
-  .score-ring-fill.green { stroke: var(--success); filter: drop-shadow(0 0 6px rgba(90,158,111,0.4)); }
-
-  .score-num-inner {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-  }
-  .score-num {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 36px;
-    font-weight: 600;
-    color: var(--cream);
-    line-height: 1;
-  }
-  .score-num-sub {
-    font-family: 'Noto Sans SC', sans-serif;
-    font-size: 10px;
-    color: var(--text-dim);
-    letter-spacing: 0.1em;
-    margin-top: 2px;
-  }
-
-  .score-meta { flex: 1; min-width: 200px; }
-  .score-label {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 26px;
-    font-weight: 600;
-    color: var(--cream);
-    margin-bottom: 8px;
-  }
-  .score-summary-text {
-    font-size: 14px;
-    line-height: 1.9;
-    color: var(--cream-dim);
-  }
-  .essay-meta-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 14px;
-  }
-  .meta-tag {
-    font-family: 'Noto Sans SC', sans-serif;
-    font-size: 11px;
-    padding: 3px 10px;
-    border: 1px solid var(--border);
-    border-radius: 2px;
-    color: var(--text-dim);
-    letter-spacing: 0.08em;
-  }
-
-  /* Dimension Grid */
-  .dim-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 14px;
-    margin-bottom: 24px;
-  }
-
-  .dim-card {
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 20px;
-    transition: border-color 0.3s;
-    animation: fadeIn 0.5s ease backwards;
-  }
-  .dim-card:hover { border-color: var(--border-strong); }
-
-  .dim-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 14px;
-  }
-  .dim-name {
-    font-size: 13px;
-    letter-spacing: 0.1em;
-    color: var(--text-dim);
-    font-family: 'Noto Sans SC', sans-serif;
-    font-weight: 400;
-  }
-  .dim-score {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 22px;
-    font-weight: 600;
-    color: var(--gold);
-  }
-
-  .dim-bar-track {
-    height: 3px;
-    background: var(--bg3);
-    border-radius: 99px;
-    overflow: hidden;
-    margin-bottom: 12px;
-  }
-  .dim-bar-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--gold), #e8c47a);
-    border-radius: 99px;
-    width: 0%;
-    transition: width 1.2s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-  .dim-comment {
-    font-size: 13px;
-    line-height: 1.8;
-    color: var(--cream-dim);
-  }
-
-  /* Detailed Analysis */
-  .analysis-block {
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 28px 32px;
-    margin-bottom: 16px;
-    animation: fadeIn 0.5s ease backwards;
-  }
-  .block-title {
-    font-family: 'Noto Serif SC', serif;
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--gold);
-    letter-spacing: 0.08em;
-    margin-bottom: 16px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  .block-title::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: var(--border);
-  }
-  .block-body {
-    font-size: 14px;
-    line-height: 2;
-    color: var(--cream-dim);
-    white-space: pre-wrap;
-  }
-
-  /* Suggestions */
-  .suggestions-list {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-  .suggestion-item {
-    display: flex;
-    gap: 14px;
-    padding: 14px 16px;
-    background: var(--bg3);
-    border-radius: 3px;
-    border-left: 2px solid var(--gold);
-    animation: fadeIn 0.4s ease backwards;
-  }
-  .suggestion-num {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 20px;
-    color: var(--gold);
-    line-height: 1;
-    flex-shrink: 0;
-    padding-top: 2px;
-  }
-  .suggestion-text {
-    font-size: 14px;
-    line-height: 1.8;
-    color: var(--cream-dim);
-  }
-
-  /* Thinking section */
-  .thinking-section {
-    margin-top: 24px;
-  }
-  .thinking-toggle {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    cursor: pointer;
-    padding: 12px 0;
-    border-top: 1px solid var(--border);
-    color: var(--text-dim);
-    font-family: 'Noto Sans SC', sans-serif;
-    font-size: 12px;
-    letter-spacing: 0.1em;
-    user-select: none;
-    transition: color 0.2s;
-  }
-  .thinking-toggle:hover { color: var(--gold-dim); }
-  .thinking-toggle svg { width: 14px; height: 14px; stroke: currentColor; fill: none; transition: transform 0.3s; }
-  .thinking-toggle.open svg { transform: rotate(180deg); }
-
-  .thinking-content {
-    display: none;
-    padding: 20px;
-    background: var(--bg3);
-    border-radius: 3px;
-    font-family: 'Noto Sans SC', sans-serif;
-    font-size: 12px;
-    line-height: 1.9;
-    color: var(--text-dim);
-    white-space: pre-wrap;
-    max-height: 300px;
-    overflow-y: auto;
-    animation: fadeIn 0.3s ease;
-  }
-  .thinking-content.open { display: block; }
-
-  /* Footer */
-  footer {
-    text-align: center;
-    padding: 60px 0 40px;
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 13px;
-    color: var(--text-dim);
-    font-style: italic;
-    opacity: 0.5;
-  }
-
-  /* ── MODAL ── */
-  .modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.75);
-    backdrop-filter: blur(4px);
-    z-index: 500;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    animation: fadeIn 0.2s ease;
-  }
-  .modal-overlay.active { display: flex; }
-
-  .modal {
-    background: var(--bg2);
-    border: 1px solid var(--border-strong);
-    border-radius: 4px;
-    padding: 40px;
-    width: 100%;
-    max-width: 480px;
-    margin: 24px;
-    position: relative;
-    box-shadow: 0 24px 80px rgba(0,0,0,0.6);
-  }
-
-  .modal-title {
-    font-family: 'Noto Serif SC', serif;
-    font-size: 20px;
-    font-weight: 600;
-    color: var(--cream);
-    letter-spacing: 0.1em;
-    margin-bottom: 28px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  .modal-title svg { width: 18px; height: 18px; stroke: var(--gold); fill: none; }
-
-  .modal-close {
-    position: absolute;
-    top: 16px;
-    right: 16px;
-    width: 32px;
-    height: 32px;
-    background: transparent;
-    border: 1px solid var(--border);
-    border-radius: 50%;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-dim);
-    transition: all 0.2s;
-  }
-  .modal-close:hover { border-color: var(--border-strong); color: var(--text); }
-  .modal-close svg { width: 14px; height: 14px; stroke: currentColor; fill: none; }
-
-  .form-group {
-    margin-bottom: 22px;
-  }
-  .form-label {
-    display: block;
-    font-family: 'Noto Sans SC', sans-serif;
-    font-size: 11px;
-    letter-spacing: 0.18em;
-    color: var(--gold-dim);
-    margin-bottom: 8px;
-    text-transform: uppercase;
-  }
-  .form-input, .form-select {
-    width: 100%;
-    background: var(--bg3);
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    padding: 11px 14px;
-    color: var(--text);
-    font-family: 'Noto Sans SC', sans-serif;
-    font-size: 13px;
-    outline: none;
-    transition: border-color 0.2s;
-    appearance: none;
-  }
-  .form-input:focus, .form-select:focus { border-color: var(--border-strong); }
-  .form-input::placeholder { color: var(--text-dim); }
-
-  .select-wrap {
-    position: relative;
-  }
-  .select-wrap::after {
-    content: '▾';
-    position: absolute;
-    right: 14px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--gold-dim);
-    pointer-events: none;
-    font-size: 12px;
-  }
-
-  .form-hint {
-    font-family: 'Noto Sans SC', sans-serif;
-    font-size: 11px;
-    color: var(--text-dim);
-    margin-top: 6px;
-    line-height: 1.6;
-  }
-
-  .btn-save {
-    width: 100%;
-    padding: 13px;
-    background: var(--red);
-    color: #fff;
-    border: none;
-    border-radius: 2px;
-    font-family: 'Noto Serif SC', serif;
-    font-size: 14px;
-    font-weight: 500;
-    letter-spacing: 0.12em;
-    cursor: pointer;
-    transition: all 0.2s;
-    margin-top: 4px;
-  }
-  .btn-save:hover { background: #d94035; box-shadow: 0 4px 20px rgba(200,55,42,0.35); }
-
-  .api-status {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-family: 'Noto Sans SC', sans-serif;
-    font-size: 11px;
-    color: var(--text-dim);
-    margin-top: 12px;
-  }
-  .api-status-dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--border);
-  }
-  .api-status-dot.ok { background: var(--success); box-shadow: 0 0 6px rgba(90,158,111,0.5); }
-  .api-status-dot.err { background: var(--red); }
-
-  /* Toast */
-  .toast {
-    position: fixed;
-    bottom: 32px;
-    left: 50%;
-    transform: translateX(-50%) translateY(80px);
-    background: var(--bg3);
-    border: 1px solid var(--border-strong);
-    border-radius: 3px;
-    padding: 12px 24px;
-    font-family: 'Noto Sans SC', sans-serif;
-    font-size: 13px;
-    color: var(--text);
-    z-index: 1000;
-    transition: transform 0.3s ease;
-    white-space: nowrap;
-  }
-  .toast.show { transform: translateX(-50%) translateY(0); }
-  .toast.error { border-color: rgba(200,55,42,0.5); color: #d4776a; }
-
-  /* Scrollbar */
-  ::-webkit-scrollbar { width: 5px; height: 5px; }
-  ::-webkit-scrollbar-track { background: var(--bg); }
-  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
-  ::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
-
-  /* Responsive */
-  @media (max-width: 600px) {
-    .score-hero { flex-direction: column; align-items: flex-start; }
-    .dim-grid { grid-template-columns: 1fr; }
-    .analysis-block { padding: 20px; }
-  }
+@media(max-width:640px){
+  .agents-grid{grid-template-columns:1fr}
+  .agents-preview{grid-template-columns:1fr 1fr}
+  .frow{grid-template-columns:1fr}
+  .topbar{padding:0 16px}
+  .page,.page-wide{padding:0 16px}
+}
 </style>
 </head>
 <body>
 
-<!-- Settings Button -->
-<button class="settings-btn" id="settingsBtn" title="设置 / Settings">
-  <svg viewBox="0 0 24 24" stroke-width="1.5">
-    <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"/>
-    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/>
-  </svg>
-</button>
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="brand">
+    <span class="brand-name">文鉴</span>
+    <span class="brand-sub">AI Essay Engine</span>
+  </div>
+  <button class="btn-icon" id="settingsBtn">
+    <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
+  </button>
+</div>
 
-<!-- Settings Modal -->
-<div class="modal-overlay" id="settingsModal">
+<!-- SETTINGS MODAL -->
+<div class="overlay" id="settingsModal">
   <div class="modal">
-    <div class="modal-title">
-      <svg viewBox="0 0 24 24" stroke-width="1.5">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 0 1 21.75 8.25Z"/>
-      </svg>
-      配置 API 设置
+    <div class="modal-head">
+      <h3>API 配置</h3>
+      <button class="modal-x" id="modalClose"><svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg></button>
     </div>
-    <button class="modal-close" id="closeModal">
-      <svg viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
-    </button>
-
-    <div class="form-group">
-      <label class="form-label" for="apiKeyInput">DeepSeek API Key</label>
-      <input type="password" class="form-input" id="apiKeyInput" placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxx">
-      <p class="form-hint">密钥存储在本地浏览器，不会上传服务器。<br>Get your key at <a href="https://platform.deepseek.com" target="_blank" style="color:var(--gold-dim)">platform.deepseek.com</a></p>
-    </div>
-
-    <div class="form-group">
-      <label class="form-label" for="modelSelect">模型选择 / Model</label>
-      <div class="select-wrap">
-        <select class="form-select" id="modelSelect">
-          <option value="deepseek-v4-pro">DeepSeek V4 Pro — 旗舰推理，深度分析</option>
-          <option value="deepseek-v4-flash">DeepSeek V4 Flash — 快速响应，轻量评析</option>
-          <option value="deepseek-chat">deepseek-chat (V4 Flash 兼容)</option>
-        </select>
+    <div class="modal-body">
+      <div class="field">
+        <label>DeepSeek API Key</label>
+        <div class="key-wrap">
+          <input type="password" id="apiKeyInput" placeholder="sk-xxxxxxxxxxxxxxxx">
+          <button class="eye-btn" id="eyeBtn"><svg id="eyeSvg" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg></button>
+        </div>
+        <p class="hint">仅存储于本地浏览器 · <a href="https://platform.deepseek.com" target="_blank" style="color:var(--c-dispatch)">platform.deepseek.com</a></p>
       </div>
-      <p class="form-hint">V4 Pro 支持 100 万 token 上下文与深度推理，推荐用于长篇作文。</p>
-    </div>
-
-    <div class="form-group">
-      <label class="form-label" for="thinkingToggle">思考模式 / Thinking Mode</label>
-      <div class="select-wrap">
-        <select class="form-select" id="thinkingToggle">
-          <option value="enabled">启用 — 深度链式推理 (CoT)</option>
-          <option value="disabled">禁用 — 直接评析，速度更快</option>
-        </select>
+      <div class="frow">
+        <div class="field">
+          <label>模型</label>
+          <select id="modelSel">
+            <option value="deepseek-reasoner">DeepSeek R2 (推理)</option>
+            <option value="deepseek-chat" selected>DeepSeek V3 (快速)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>并发模式</label>
+          <select id="concurrencySel">
+            <option value="full">全速并发</option>
+            <option value="staggered">错峰启动</option>
+          </select>
+        </div>
       </div>
-    </div>
-
-    <button class="btn-save" id="saveSettings">保存设置 / Save</button>
-
-    <div class="api-status" id="apiStatus">
-      <div class="api-status-dot" id="statusDot"></div>
-      <span id="statusText">尚未配置 API Key</span>
+      <div class="status-bar">
+        <div class="sindic" id="sindic"></div>
+        <span id="statusMsg">尚未配置</span>
+      </div>
+      <button class="btn-save" id="saveBtn">保存</button>
     </div>
   </div>
 </div>
 
-<!-- Toast -->
+<!-- TOAST -->
 <div class="toast" id="toast"></div>
 
-<!-- Main -->
-<div class="container">
-  <header>
-    <div class="header-ornament">
-      <span></span>
-      <svg viewBox="0 0 12 12"><path d="M6 0L7.5 4.5H12L8.25 7.5L9.75 12L6 9L2.25 12L3.75 7.5L0 4.5H4.5Z"/></svg>
-      <span></span>
+<!-- ════ INPUT SCREEN ════ -->
+<div id="inputScreen">
+  <div class="page">
+    <div class="input-hero">
+      <h2>投入一篇作文，<em>十位专家</em><br>为你同时开始工作。</h2>
+      <p>10 Agents · Concurrent Streaming · Chinese &amp; English</p>
     </div>
-    <h1 class="site-title">AI 作文评析器<em>·</em></h1>
-    <p class="site-sub">Powered by DeepSeek V4 · Intelligent Essay Analysis Agent</p>
-  </header>
 
-  <div class="section-divider"><span>输入作文 / Input Essay</span></div>
-
-  <!-- Input Panel -->
-  <div class="input-panel" id="inputPanel">
-    <div class="input-toolbar">
-      <div class="lang-badge" id="langBadge">语言检测中…</div>
-      <div class="char-count" id="charCount">0 字</div>
+    <div class="input-card">
+      <div class="input-toolbar">
+        <div class="lang-pill" id="langPill">自动检测语言</div>
+        <div class="char-count" id="charCount">0 字符</div>
+      </div>
+      <textarea id="essayInput" placeholder="将你的中文或英文作文粘贴于此……&#10;&#10;Paste your essay here — any genre, any language."></textarea>
     </div>
-    <textarea
-      id="essay-input"
-      placeholder="在此输入您的中文或英文作文，支持各类文体……&#10;&#10;Paste your Chinese or English essay here. All genres welcome — narrative, expository, argumentative, creative…"
-      spellcheck="false"
-    ></textarea>
+
+    <div class="action-row">
+      <button class="btn-primary" id="analyzeBtn">
+        <svg viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z"/></svg>
+        启动十 Agent 评析引擎
+      </button>
+      <button class="btn-ghost" id="clearBtn">清空</button>
+    </div>
+
+    <p class="preview-label">Agent 集群阵容</p>
+    <div class="agents-preview" id="agentPreview"></div>
   </div>
+</div>
 
-  <div class="btn-row">
-    <button class="btn-analyze" id="analyzeBtn">开 始 评 析</button>
-    <button class="btn-clear" id="clearBtn">清空 / Clear</button>
-  </div>
-
-  <!-- Loading -->
-  <div class="analysis-loading" id="loadingSection">
-    <div class="thinking-indicator">
-      <span>Agent 引擎运行中</span>
-      <div class="thinking-dots">
-        <span></span><span></span><span></span>
+<!-- ════ DASHBOARD SCREEN ════ -->
+<div id="dashboardScreen">
+  <div class="page-wide">
+    <div class="dash-topbar">
+      <div class="dash-title" id="dashTitle">初始化 Agent 引擎…</div>
+      <div class="dash-right">
+        <div class="stat-badge"><div class="stat-num" id="statDone">0</div><div class="stat-lbl">完成</div></div>
+        <div class="stat-badge"><div class="stat-num" id="statRunning">0</div><div class="stat-lbl">运行中</div></div>
+        <div class="stat-badge"><div class="stat-num" id="statTotal">0</div><div class="stat-lbl">总计</div></div>
+        <button class="btn-ghost" id="backBtn" style="font-size:12px;padding:8px 14px">← 返回</button>
       </div>
     </div>
-    <div class="stage-list" id="stageList">
-      <div class="stage-item" data-stage="0">
-        <div class="stage-num">1</div>
-        <span>解析作文类型与语言</span>
-      </div>
-      <div class="stage-item" data-stage="1">
-        <div class="stage-num">2</div>
-        <span>分析结构与逻辑框架</span>
-      </div>
-      <div class="stage-item" data-stage="2">
-        <div class="stage-num">3</div>
-        <span>评估语言表达与风格</span>
-      </div>
-      <div class="stage-item" data-stage="3">
-        <div class="stage-num">4</div>
-        <span>检查内容与论点深度</span>
-      </div>
-      <div class="stage-item" data-stage="4">
-        <div class="stage-num">5</div>
-        <span>生成综合评分与建议</span>
-      </div>
-    </div>
-  </div>
 
-  <!-- Results -->
-  <div id="results">
-    <div class="section-divider"><span>评析报告 / Analysis Report</span></div>
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
 
-    <!-- Score Hero -->
-    <div class="score-hero" id="scoreHero">
-      <div class="score-ring-wrap">
-        <svg viewBox="0 0 120 120">
-          <circle class="score-ring-track" cx="60" cy="60" r="50"/>
-          <circle class="score-ring-fill" id="scoreRing" cx="60" cy="60" r="50"/>
-        </svg>
-        <div class="score-num-inner">
-          <div class="score-num" id="scoreNum">—</div>
-          <div class="score-num-sub">综合分</div>
+    <!-- Dispatcher -->
+    <div class="section-label">调度总指挥</div>
+    <div class="dispatch-card" id="dispatchCard">
+      <div class="dispatch-head">
+        <div class="dispatch-head-title">
+          <span style="font-size:15px">🔀</span>
+          调度总指挥 · Dispatcher
+          <span style="font-size:10px;font-family:'DM Mono',monospace;opacity:.5;margin-left:4px">AGENT #0</span>
         </div>
+        <span class="badge-pill" style="background:var(--c-dispatch)">PRIMARY · CORE</span>
       </div>
-      <div class="score-meta">
-        <div class="score-label" id="scoreLabel">总体评价</div>
-        <div class="score-summary-text" id="scoreSummary"></div>
-        <div class="essay-meta-tags" id="metaTags"></div>
-      </div>
+      <div class="dispatch-body" id="dispatchBody"><span style="color:var(--text3)">等待启动…</span></div>
     </div>
 
-    <!-- Dimension Cards -->
-    <div class="dim-grid" id="dimGrid"></div>
+    <!-- Core agents -->
+    <div class="section-label">核心 Agent 集群（5 个并发）</div>
+    <div class="agents-grid" id="coreGrid"></div>
 
-    <!-- Detailed Analysis Blocks -->
-    <div id="analysisBlocks"></div>
-
-    <!-- Suggestions -->
-    <div class="analysis-block" id="suggestionsBlock" style="display:none">
-      <div class="block-title">改进建议</div>
-      <div class="suggestions-list" id="suggestionsList"></div>
-    </div>
-
-    <!-- Thinking -->
-    <div class="thinking-section" id="thinkingSection" style="display:none">
-      <div class="thinking-toggle" id="thinkingToggle">
-        <svg viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"/></svg>
-        查看 AI 推理过程 / View Thinking Process
-      </div>
-      <div class="thinking-content" id="thinkingContent"></div>
-    </div>
-
-    <div class="btn-row" style="margin-top:32px; margin-bottom:8px">
-      <button class="btn-analyze" id="reanalyzeBtn">重新评析</button>
-      <button class="btn-clear" id="backBtn">返回修改</button>
+    <!-- Conditional agents -->
+    <div id="conditionalSection" style="display:none">
+      <div class="section-label">条件 Agent（按需激活）</div>
+      <div class="agents-grid" id="conditionalGrid"></div>
     </div>
   </div>
-
-  <footer>作文是思维的镜子 · Essays are mirrors of the mind</footer>
 </div>
 
 <script>
-// ─── STATE ─────────────────────────────────────────────────────────────────
-let config = {
-  apiKey: '',
-  model: 'deepseek-v4-pro',
-  thinking: 'enabled',
-};
+'use strict';
 
-// Load from localStorage
-try {
-  const saved = JSON.parse(localStorage.getItem('essay-analyzer-config') || '{}');
-  Object.assign(config, saved);
-} catch(e) {}
+/* ═══ CONFIG ═══ */
+let cfg = { apiKey:'', model:'deepseek-chat', concurrency:'staggered' };
+try { Object.assign(cfg, JSON.parse(localStorage.getItem('wenjian-v2')||'{}')); } catch{}
 
-// ─── ELEMENTS ──────────────────────────────────────────────────────────────
-const essayInput   = document.getElementById('essay-input');
-const langBadge    = document.getElementById('langBadge');
-const charCount    = document.getElementById('charCount');
-const analyzeBtn   = document.getElementById('analyzeBtn');
-const clearBtn     = document.getElementById('clearBtn');
-const loadingSec   = document.getElementById('loadingSection');
-const resultsSec   = document.getElementById('results');
-const settingsBtn  = document.getElementById('settingsBtn');
-const settingsModal= document.getElementById('settingsModal');
-const closeModal   = document.getElementById('closeModal');
-const apiKeyInput  = document.getElementById('apiKeyInput');
-const modelSelect  = document.getElementById('modelSelect');
-const thinkingToggle = document.getElementById('thinkingToggle');
-const saveSettings = document.getElementById('saveSettings');
-const statusDot    = document.getElementById('statusDot');
-const statusText   = document.getElementById('statusText');
-const toast        = document.getElementById('toast');
-const stageList    = document.getElementById('stageList');
-const reanalyzeBtn = document.getElementById('reanalyzeBtn');
-const backBtn      = document.getElementById('backBtn');
+let totalAgents=0, doneAgents=0, runningAgents=0;
 
-// ─── MODAL ─────────────────────────────────────────────────────────────────
-function openSettings() {
-  apiKeyInput.value = config.apiKey;
-  modelSelect.value = config.model;
-  thinkingToggle.value = config.thinking;
-  updateApiStatus();
-  settingsModal.classList.add('active');
-}
-function closeSettings() { settingsModal.classList.remove('active'); }
+/* ═══ AGENT DEFINITIONS ═══ */
+const CORE_AGENTS = [
+  {
+    id:'evaluator', name:'综合评审官', en:'Chief Evaluator',
+    emoji:'⭐', color:'#0d7377', badge:'CORE',
+    maxTokens:850,
+    getPrompt(essay, lang) {
+      const L = lang==='zh'?'中文':'英文';
+      return {
+        sys:`你是资深${L}作文评审专家，语言严谨而有温度。请对这篇作文进行综合评分与整体点评。
 
-settingsBtn.addEventListener('click', openSettings);
-closeModal.addEventListener('click', closeSettings);
-settingsModal.addEventListener('click', e => { if(e.target === settingsModal) closeSettings(); });
+严格按以下格式输出（不用markdown）：
+综合评分：XX / 100
+等级评定：[S极优 / A优秀 / B良好 / C中等 / D较差]
 
-saveSettings.addEventListener('click', () => {
-  config.apiKey = apiKeyInput.value.trim();
-  config.model  = modelSelect.value;
-  config.thinking = thinkingToggle.value;
-  localStorage.setItem('essay-analyzer-config', JSON.stringify(config));
-  updateApiStatus();
-  showToast('设置已保存 ✓');
-  setTimeout(closeSettings, 800);
-});
-
-function updateApiStatus() {
-  if (config.apiKey) {
-    statusDot.className = 'api-status-dot ok';
-    statusText.textContent = `已配置 · ${config.model}`;
-  } else {
-    statusDot.className = 'api-status-dot';
-    statusText.textContent = '尚未配置 API Key';
-  }
-}
-updateApiStatus();
-
-// ─── TOAST ─────────────────────────────────────────────────────────────────
-function showToast(msg, isError = false) {
-  toast.textContent = msg;
-  toast.className = 'toast' + (isError ? ' error' : '');
-  toast.classList.add('show');
-  setTimeout(() => toast.classList.remove('show'), 3000);
-}
-
-// ─── LANGUAGE DETECTION ────────────────────────────────────────────────────
-function detectLang(text) {
-  const cn = (text.match(/[\u4e00-\u9fff]/g) || []).length;
-  const total = text.replace(/\s/g, '').length;
-  if (!total) return 'unknown';
-  return (cn / total > 0.2) ? 'cn' : 'en';
-}
-
-essayInput.addEventListener('input', () => {
-  const text = essayInput.value;
-  const len = text.length;
-  charCount.textContent = len > 0 ? `${len} 字符` : '0 字';
-  const lang = detectLang(text);
-  if (lang === 'cn') {
-    langBadge.textContent = '中文作文';
-    langBadge.className = 'lang-badge cn';
-  } else if (lang === 'en') {
-    langBadge.textContent = 'English Essay';
-    langBadge.className = 'lang-badge en';
-  } else {
-    langBadge.textContent = '语言检测中…';
-    langBadge.className = 'lang-badge';
-  }
-});
-
-clearBtn.addEventListener('click', () => {
-  essayInput.value = '';
-  essayInput.dispatchEvent(new Event('input'));
-  resultsSec.classList.remove('active');
-  loadingSec.classList.remove('active');
-  analyzeBtn.disabled = false;
-});
-
-backBtn.addEventListener('click', () => {
-  resultsSec.classList.remove('active');
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-});
-
-reanalyzeBtn.addEventListener('click', () => {
-  resultsSec.classList.remove('active');
-  startAnalysis();
-});
-
-// ─── STAGE PROGRESS ────────────────────────────────────────────────────────
-const stages = document.querySelectorAll('.stage-item');
-let stageTimers = [];
-
-function clearStages() {
-  stageTimers.forEach(clearTimeout);
-  stageTimers = [];
-  stages.forEach(s => {
-    s.classList.remove('active', 'done');
-    const ic = s.querySelector('.stage-icon');
-    if (ic) ic.remove();
-    const num = s.querySelector('.stage-num');
-    if (num) num.style.display = '';
-  });
-}
-
-function animateStages() {
-  clearStages();
-  const delays = [0, 1200, 2600, 4200, 6000];
-  stages.forEach((s, i) => {
-    const t1 = setTimeout(() => {
-      stages.forEach((ss, ii) => { if (ii < i) markStageDone(ss); });
-      s.classList.add('active');
-    }, delays[i]);
-    stageTimers.push(t1);
-  });
-}
-
-function markStageDone(el) {
-  el.classList.remove('active');
-  el.classList.add('done');
-  const num = el.querySelector('.stage-num');
-  if (num) { num.textContent = '✓'; }
-}
-
-function finishAllStages() {
-  stageTimers.forEach(clearTimeout);
-  stages.forEach(s => markStageDone(s));
-}
-
-// ─── ANALYSIS ──────────────────────────────────────────────────────────────
-analyzeBtn.addEventListener('click', () => {
-  if (!essayInput.value.trim()) {
-    showToast('请先输入作文内容', true);
-    return;
-  }
-  startAnalysis();
-});
-
-async function startAnalysis() {
-  if (!config.apiKey) {
-    showToast('请先在设置中填写 API Key', true);
-    openSettings();
-    return;
-  }
-
-  const essay = essayInput.value.trim();
-  const lang = detectLang(essay);
-  const isZh = lang === 'cn';
-
-  // Show loading
-  loadingSec.classList.add('active');
-  resultsSec.classList.remove('active');
-  analyzeBtn.disabled = true;
-  window.scrollTo({ top: loadingSec.offsetTop - 80, behavior: 'smooth' });
-  animateStages();
-
-  const systemPrompt = `你是一位顶级的作文评析专家，融合了语文名师、英语写作导师和资深编辑的智慧。你对中英文写作均有深刻理解，能够精准识别作文的优点和不足，并提出具体、可操作的改进建议。
-
-你的评析必须：
-1. 专业深入，有独到见解，不流于表面
-2. 语言温和而不失严谨，鼓励与批评并重
-3. 结合具体段落或句子举例分析
-4. 输出格式严格遵循 JSON
-
-请用 JSON 格式返回评析结果，结构如下：
-{
-  "lang": "zh" 或 "en",
-  "essay_type": "记叙文/议论文/说明文/散文/Argumentative/Narrative/Expository/Descriptive/等",
-  "overall_score": 85,
-  "score_label": "优秀/良好/一般/需改进 或 Excellent/Good/Fair/Needs Work",
-  "summary": "总体评语（100-150字），对作文作整体性评价",
-  "word_count": 实际字数,
-  "dimensions": [
-    { "name": "结构布局", "en_name": "Structure", "score": 85, "comment": "具体评语（50-80字）" },
-    { "name": "语言表达", "en_name": "Language", "score": 88, "comment": "具体评语（50-80字）" },
-    { "name": "内容立意", "en_name": "Content", "score": 82, "comment": "具体评语（50-80字）" },
-    { "name": "逻辑论证", "en_name": "Logic", "score": 80, "comment": "具体评语（50-80字）" },
-    { "name": "文采风格", "en_name": "Style", "score": 87, "comment": "具体评语（50-80字）" },
-    { "name": "规范准确", "en_name": "Accuracy", "score": 90, "comment": "具体评语（50-80字）" }
-  ],
-  "detailed_analysis": {
-    "strengths": "闪光点分析（150-200字）：具体指出作文的1-3个突出优点，引用原文",
-    "weaknesses": "不足之处（150-200字）：具体指出2-3个需要改进的地方，结合具体段落",
-    "language_highlights": "语言亮点（100-150字）：摘录并点评优秀的词句表达",
-    "structure_analysis": "结构分析（100-150字）：分析文章的谋篇布局"
+总体评语（150字内）：
+请具体指出1-2个最突出的优点，和1个最主要的不足。语言像一位既严格又充满人文关怀的语文老师。`,
+        usr: essay
+      };
+    }
   },
-  "suggestions": [
-    "具体改进建议1（30-50字，可操作）",
-    "具体改进建议2",
-    "具体改进建议3",
-    "具体改进建议4",
-    "具体改进建议5"
-  ]
+  {
+    id:'structure', name:'结构建筑师', en:'Structure Architect',
+    emoji:'🏛️', color:'#2d7d46', badge:'CORE',
+    maxTokens:750,
+    getPrompt(essay, lang) {
+      const L = lang==='zh'?'中文':'英文';
+      return {
+        sys:`你是专攻文章结构分析的专家。请用流畅的散文分析这篇${L}作文的谋篇布局（150字内）：
+・开篇是否有力、如何抓住读者
+・段落层次是否清晰、逻辑链条是否完整
+・过渡是否自然
+・结尾是否有力、首尾是否呼应
+最后给出：结构评分 XX/100`,
+        usr: essay
+      };
+    }
+  },
+  {
+    id:'language', name:'语言美学家', en:'Language Connoisseur',
+    emoji:'🖊️', color:'#b45309', badge:'CORE',
+    maxTokens:750,
+    getPrompt(essay, lang) {
+      const L = lang==='zh'?'中文':'英文';
+      return {
+        sys:`你是专精语言鉴赏的文学评论家。请用美的文字分析这篇${L}作文的语言（150字内）：
+・词汇是否精准丰富
+・句式长短是否协调
+・修辞手法运用如何
+・摘录1句最出彩的语句并点评妙处
+最后给出：语言评分 XX/100`,
+        usr: essay
+      };
+    }
+  },
+  {
+    id:'ideas', name:'思想探照灯', en:'Idea Spotlight',
+    emoji:'💡', color:'#7c3aed', badge:'CORE',
+    maxTokens:700,
+    getPrompt(essay, lang) {
+      const L = lang==='zh'?'中文':'英文';
+      return {
+        sys:`你是专注于思想深度分析的评论家，有批判性思维。请挖掘这篇${L}作文的内核（150字内）：
+・核心立意是否新颖深刻，还是流于俗套
+・有没有独到见解，还是人云亦云
+・内容是否充实，有没有空洞说教
+・作者的思维成熟度与视野宽度
+最后给出：思想深度 XX/100`,
+        usr: essay
+      };
+    }
+  },
+  {
+    id:'aidet', name:'AI 侦探', en:'AI Detector',
+    emoji:'🤖', color:'#be185d', badge:'CORE',
+    maxTokens:650,
+    getPrompt(essay, lang) {
+      const L = lang==='zh'?'中文':'英文';
+      return {
+        sys:`你是AI生成内容检测专家。请像侦探一样判断这篇${L}作文是否由AI生成（140字内）：
+・语言是否过于"完美"或机械化
+・有无AI特有套路（首先其次最后、过渡语公式化等）
+・情感与细节是否真实具体（真人往往有独特细节）
+・词汇是否单调重复
+
+最终判定：[人工撰写 ✓ / AI生成可能性高 ⚠ / 疑似AI辅助 ～]
+置信度：XX%`,
+        usr: essay
+      };
+    }
+  },
+];
+
+const CONDITIONAL_AGENTS = [
+  {
+    id:'coach', name:'改进教练', en:'Improvement Coach',
+    emoji:'🎯', color:'#1d4ed8', badge:'COND',
+    condition: ()=>true,
+    maxTokens:700,
+    getPrompt(essay, lang) {
+      const L = lang==='zh'?'中文':'英文';
+      return {
+        sys:`你是专注于改进建议的写作教练。请为这篇${L}作文提供5条具体可操作的改进建议。
+每条用"→ "开头，不超过45字，直接说做什么、在哪改，不废话。
+5条建议覆盖不同维度（立意/结构/语言/细节/升华），不重复。`,
+        usr: essay
+      };
+    }
+  },
+  {
+    id:'emotion', name:'情感解码师', en:'Emotion Decoder',
+    emoji:'💭', color:'#9d174d', badge:'COND',
+    condition: (meta)=> meta && (
+      /记叙|散文|Narrative|Descriptive|Creative/i.test(meta.type||'') || meta.isNarrative
+    ),
+    maxTokens:600,
+    getPrompt(essay, lang) {
+      const L = lang==='zh'?'中文':'英文';
+      return {
+        sys:`你是情感共鸣分析师。请分析这篇${L}作文的情感力量（130字内）：
+・情感基调是什么，是否打动人心
+・哪个细节最触动读者（引用原文）
+・情感是节制有力，还是过于煽情
+・读完后留下什么情绪
+情感共鸣评分：XX/100`,
+        usr: essay
+      };
+    }
+  },
+  {
+    id:'allusion', name:'典故猎人', en:'Allusion Hunter',
+    emoji:'📖', color:'#92400e', badge:'COND',
+    condition: (meta)=> meta && meta.isZh,
+    maxTokens:600,
+    getPrompt(essay, lang) {
+      return {
+        sys:`你是专注典故与文化内涵分析的古文专家。请分析这篇中文作文中的典故运用（130字内）：
+・列出文中使用的典故/成语并逐一点评用得是否恰当
+・若无典故，分析作者是否有意借鉴某种文化资源
+・建议哪处可加入适当的典故或引用来增强论证
+文化底蕴评分：XX/100`,
+        usr: essay
+      };
+    }
+  },
+  {
+    id:'errors', name:'错误显微镜', en:'Error Microscope',
+    emoji:'🔍', color:'#991b1b', badge:'COND',
+    condition: ()=>true,
+    maxTokens:600,
+    getPrompt(essay, lang) {
+      const L = lang==='zh'?'中文':'英文';
+      return {
+        sys:`你是专业校对专家。请像用显微镜检查这篇${L}作文的语言规范（130字内）：
+・错别字/拼写错误（引用原文+正确形式）
+・语法错误（指出具体位置）
+・标点/格式问题
+・措辞不当之处
+若无错误请直接说"未发现明显错误"，然后指出可更精准的地方。
+规范性评分：XX/100`,
+        usr: essay
+      };
+    }
+  },
+  {
+    id:'compare', name:'横向对比师', en:'Benchmark Analyst',
+    emoji:'📊', color:'#0e7490', badge:'COND',
+    condition: ()=>true,
+    maxTokens:600,
+    getPrompt(essay, lang) {
+      const L = lang==='zh'?'中文':'英文';
+      return {
+        sys:`你是作文水平测评专家，了解各学段写作标准。请判断这篇${L}作文的水平定位（130字内）：
+・最匹配的学段：[小学/初中/高中/大学/成人专业写作]
+・与同学段优秀作文相比处于什么位置（前10%/前30%/中等/偏下）
+・一句话说明判断依据
+・如果是高考作文，预估分数区间
+学段定位：[结论]`,
+        usr: essay
+      };
+    }
+  },
+];
+
+/* ═══ DETECT LANG ═══ */
+function detectLang(t) {
+  const cn=(t.match(/[\u4e00-\u9fff]/g)||[]).length;
+  return cn/Math.max(1,t.replace(/\s/g,'').length)>.15?'zh':'en';
 }
 
-注意：只返回 JSON，不要有任何其他文字或 markdown 标记。`;
-
-  const userPrompt = `请评析以下${isZh ? '中文' : '英文'}作文：\n\n${essay}`;
-
+/* ═══ API CALL (SSE STREAMING) ═══ */
+async function streamCall({sys, usr, maxTokens=700, onChunk, onDone, onError}) {
   const body = {
-    model: config.model,
-    max_tokens: 4096,
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt }
-    ],
-    stream: false,
+    model: cfg.model,
+    max_tokens: maxTokens,
+    stream: true,
+    messages:[{role:'system',content:sys},{role:'user',content:usr}],
   };
 
-  if (config.thinking === 'enabled') {
-    body.thinking = { type: 'enabled' };
-    body.reasoning_effort = 'high';
-  }
-
+  let res;
   try {
-    const res = await fetch('https://api.deepseek.com/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.apiKey}`,
-      },
-      body: JSON.stringify(body),
+    res = await fetch('https://api.deepseek.com/chat/completions',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+cfg.apiKey},
+      body:JSON.stringify(body),
     });
+  } catch(e){ onError('网络错误: '+e.message); return; }
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error?.message || `HTTP ${res.status}`);
-    }
+  if(!res.ok){
+    let m='HTTP '+res.status;
+    try{const j=await res.json();m=j.error?.message||m;}catch{}
+    onError(m); return;
+  }
 
-    const data = await res.json();
-    finishAllStages();
-
-    // Extract thinking
-    let thinkingText = '';
-    let content = '';
-
-    const msg = data.choices?.[0]?.message;
-    if (!msg) throw new Error('Invalid API response');
-
-    // Handle content blocks (thinking mode)
-    if (Array.isArray(msg.content)) {
-      for (const block of msg.content) {
-        if (block.type === 'thinking') thinkingText += block.thinking || '';
-        if (block.type === 'text') content += block.text || '';
+  const reader=res.body.getReader();
+  const dec=new TextDecoder();
+  let buf='';
+  try {
+    while(true){
+      const{done,value}=await reader.read();
+      if(done) break;
+      buf+=dec.decode(value,{stream:true});
+      const lines=buf.split('\n'); buf=lines.pop()||'';
+      for(const line of lines){
+        if(!line.startsWith('data:')) continue;
+        const raw=line.slice(5).trim();
+        if(raw==='[DONE]'){onDone();return;}
+        try{
+          const p=JSON.parse(raw);
+          const delta=p.choices?.[0]?.delta;
+          if(!delta) continue;
+          if(Array.isArray(delta.content)){
+            for(const blk of delta.content)
+              if(blk.type==='text'&&blk.text) onChunk(blk.text);
+          } else if(typeof delta.content==='string'&&delta.content){
+            onChunk(delta.content);
+          }
+        }catch{}
       }
-    } else {
-      content = msg.content || '';
-      thinkingText = msg.reasoning_content || '';
     }
+  } catch(e){ onError('读取错误: '+e.message); return; }
+  onDone();
+}
 
-    // Parse JSON
-    const jsonStr = content.replace(/```json\s*/g,'').replace(/```\s*/g,'').trim();
-    let parsed;
-    try {
-      parsed = JSON.parse(jsonStr);
-    } catch(e) {
-      // Try to extract JSON from response
-      const match = jsonStr.match(/\{[\s\S]*\}/);
-      if (!match) throw new Error('无法解析评析结果，请重试');
-      parsed = JSON.parse(match[0]);
-    }
+/* ═══ BUILD CARD ═══ */
+function buildCard(agent) {
+  const el=document.createElement('div');
+  el.className='agent-card';
+  el.id='card-'+agent.id;
+  el.style.setProperty('--ac', agent.color);
+  el.style.borderTopColor=agent.color;
+  el.innerHTML=`
+<div class="agent-card-head">
+  <div class="agent-head-left">
+    <span class="emoji">${agent.emoji}</span>
+    ${agent.name}
+    <span class="en-name">/ ${agent.en}</span>
+  </div>
+  <div class="agent-status">
+    <div class="sdot" id="sdot-${agent.id}"></div>
+    <span id="sstat-${agent.id}">待机</span>
+  </div>
+</div>
+<div class="agent-body" id="body-${agent.id}">
+  <div class="waiting-state">
+    <div class="waiting-dots"><span></span><span></span><span></span></div>
+    <span style="font-size:10px;color:var(--text3);font-family:'DM Mono',monospace">等待调度…</span>
+  </div>
+</div>
+<div class="agent-foot">
+  <span class="token-count" id="tok-${agent.id}" data-chars="0">0 tokens</span>
+  <span style="font-size:10px;font-family:'DM Mono',monospace;color:var(--border2)">${agent.badge}</span>
+</div>`;
+  return el;
+}
 
-    await showResults(parsed, thinkingText, essay);
+function setStatus(id, state, label) {
+  const d=document.getElementById('sdot-'+id);
+  const s=document.getElementById('sstat-'+id);
+  if(!d) return;
+  d.className='sdot '+state;
+  const map={waiting:'待机',running:'运行中',done:'✓ 完成',error:'✗ 错误'};
+  if(s) s.textContent=label||(map[state]||state);
+}
 
-  } catch (err) {
-    loadingSec.classList.remove('active');
-    analyzeBtn.disabled = false;
-    showToast(`评析失败：${err.message}`, true);
-    clearStages();
+function appendChunk(id, chunk) {
+  const body=document.getElementById('body-'+id);
+  if(!body) return;
+  const w=body.querySelector('.waiting-state');
+  if(w){ w.remove(); body.classList.add('typing'); }
+  body.textContent+=chunk;
+  const tok=document.getElementById('tok-'+id);
+  if(tok){
+    const n=parseInt(tok.dataset.chars||'0')+chunk.length;
+    tok.dataset.chars=n;
+    tok.textContent='~'+Math.round(n/4)+' tokens';
+  }
+  body.scrollTop=body.scrollHeight;
+}
+
+function finishCard(id){
+  const b=document.getElementById('body-'+id);
+  if(b) b.classList.remove('typing');
+  setStatus(id,'done');
+  doneAgents++; runningAgents=Math.max(0,runningAgents-1);
+  updateStats();
+}
+
+function errorCard(id,msg){
+  const b=document.getElementById('body-'+id);
+  if(b){ b.classList.remove('typing'); b.textContent+=(b.textContent?'\n\n':'')+'[错误] '+msg; }
+  setStatus(id,'error');
+  doneAgents++; runningAgents=Math.max(0,runningAgents-1);
+  updateStats();
+}
+
+function startCard(id){
+  setStatus(id,'running');
+  runningAgents++;
+  updateStats();
+}
+
+function updateStats(){
+  const pct=totalAgents>0?(doneAgents/totalAgents)*100:0;
+  document.getElementById('progressFill').style.width=pct+'%';
+  document.getElementById('statDone').textContent=doneAgents;
+  document.getElementById('statRunning').textContent=runningAgents;
+  if(doneAgents>=totalAgents&&totalAgents>0){
+    document.getElementById('dashTitle').textContent='✓ 评析完成 · 共 '+totalAgents+' 个 Agent';
   }
 }
 
-// ─── RENDER RESULTS ────────────────────────────────────────────────────────
-async function showResults(data, thinkingText, originalEssay) {
-  // Delay briefly so stage animation finishes
-  await new Promise(r => setTimeout(r, 600));
-  loadingSec.classList.remove('active');
-
-  // Score ring
-  const score = Math.min(100, Math.max(0, data.overall_score || 0));
-  const scoreNum = document.getElementById('scoreNum');
-  const scoreRing = document.getElementById('scoreRing');
-  const scoreSummary = document.getElementById('scoreSummary');
-  const scoreLabel = document.getElementById('scoreLabel');
-  const metaTags = document.getElementById('metaTags');
-
-  scoreNum.textContent = score;
-  scoreLabel.textContent = data.score_label || '综合评价';
-  scoreSummary.textContent = data.summary || '';
-
-  // Color ring by score
-  if (score >= 80) scoreRing.classList.add('green');
-  else if (score < 60) scoreRing.classList.add('red');
-
-  // Animate ring: circumference = 2π×50 ≈ 314
-  const offset = 314 - (314 * score / 100);
-  setTimeout(() => { scoreRing.style.strokeDashoffset = offset; }, 100);
-
-  // Meta tags
-  metaTags.innerHTML = '';
-  const tags = [
-    data.essay_type,
-    data.lang === 'zh' ? '中文' : 'English',
-    data.word_count ? `${data.word_count} 字` : null,
-  ].filter(Boolean);
-  tags.forEach(t => {
-    const el = document.createElement('span');
-    el.className = 'meta-tag';
-    el.textContent = t;
-    metaTags.appendChild(el);
+/* ═══ RUN ONE AGENT ═══ */
+function runAgent(agent, essay, lang, meta){
+  startCard(agent.id);
+  const p=agent.getPrompt(essay,lang,meta);
+  streamCall({
+    sys:p.sys, usr:p.usr||essay,
+    maxTokens:agent.maxTokens||700,
+    onChunk(c){ appendChunk(agent.id,c); },
+    onDone(){ finishCard(agent.id); },
+    onError(e){ errorCard(agent.id,e); }
   });
-
-  // Dimension cards
-  const dimGrid = document.getElementById('dimGrid');
-  dimGrid.innerHTML = '';
-  (data.dimensions || []).forEach((dim, i) => {
-    const card = document.createElement('div');
-    card.className = 'dim-card';
-    card.style.animationDelay = `${i * 0.08}s`;
-    const s = Math.min(100, dim.score || 0);
-    card.innerHTML = `
-      <div class="dim-header">
-        <span class="dim-name">${dim.name} <span style="opacity:0.5;font-size:11px">/ ${dim.en_name}</span></span>
-        <span class="dim-score">${s}</span>
-      </div>
-      <div class="dim-bar-track"><div class="dim-bar-fill" data-width="${s}"></div></div>
-      <div class="dim-comment">${dim.comment || ''}</div>
-    `;
-    dimGrid.appendChild(card);
-  });
-  // Animate bars after render
-  setTimeout(() => {
-    document.querySelectorAll('.dim-bar-fill').forEach(b => {
-      b.style.width = b.dataset.width + '%';
-    });
-  }, 200);
-
-  // Detailed blocks
-  const blocksContainer = document.getElementById('analysisBlocks');
-  blocksContainer.innerHTML = '';
-  const det = data.detailed_analysis || {};
-  const blockDefs = [
-    { title: '闪光点 · Strengths', key: 'strengths' },
-    { title: '结构分析 · Structure', key: 'structure_analysis' },
-    { title: '语言亮点 · Language Highlights', key: 'language_highlights' },
-    { title: '待改进之处 · Areas for Improvement', key: 'weaknesses' },
-  ];
-  blockDefs.forEach((def, i) => {
-    if (!det[def.key]) return;
-    const block = document.createElement('div');
-    block.className = 'analysis-block';
-    block.style.animationDelay = `${i * 0.1}s`;
-    block.innerHTML = `<div class="block-title">${def.title}</div><div class="block-body">${det[def.key]}</div>`;
-    blocksContainer.appendChild(block);
-  });
-
-  // Suggestions
-  const suggs = data.suggestions || [];
-  const sugBlock = document.getElementById('suggestionsBlock');
-  const sugList  = document.getElementById('suggestionsList');
-  if (suggs.length) {
-    sugList.innerHTML = '';
-    suggs.forEach((s, i) => {
-      const item = document.createElement('div');
-      item.className = 'suggestion-item';
-      item.style.animationDelay = `${i * 0.08}s`;
-      item.innerHTML = `<div class="suggestion-num">${i+1}</div><div class="suggestion-text">${s}</div>`;
-      sugList.appendChild(item);
-    });
-    sugBlock.style.display = 'block';
-  } else {
-    sugBlock.style.display = 'none';
-  }
-
-  // Thinking
-  const thinkingSec = document.getElementById('thinkingSection');
-  const thinkingContent = document.getElementById('thinkingContent');
-  const thinkingToggleBtn = document.getElementById('thinkingToggle');
-
-  if (thinkingText && thinkingText.trim()) {
-    thinkingContent.textContent = thinkingText;
-    thinkingSec.style.display = 'block';
-    thinkingToggleBtn.addEventListener('click', () => {
-      thinkingToggleBtn.classList.toggle('open');
-      thinkingContent.classList.toggle('open');
-    });
-  } else {
-    thinkingSec.style.display = 'none';
-  }
-
-  // Show results
-  resultsSec.classList.add('active');
-  analyzeBtn.disabled = false;
-
-  setTimeout(() => {
-    window.scrollTo({ top: resultsSec.offsetTop - 80, behavior: 'smooth' });
-  }, 100);
 }
 
-// ─── INIT ──────────────────────────────────────────────────────────────────
-// Prompt open settings if no API key
-if (!config.apiKey) {
-  setTimeout(() => {
-    showToast('请先配置 DeepSeek API Key，点击右上角 ⚙️ 图标');
-  }, 1200);
+/* ═══ DISPATCHER ═══ */
+async function runDispatcher(essay, lang){
+  return new Promise(resolve=>{
+    const body=document.getElementById('dispatchBody');
+    body.innerHTML='<span style="color:var(--text3);font-family:\'DM Mono\',monospace;font-size:12px">分析中</span><span style="animation:blink .7s step-end infinite;color:var(--c-dispatch)"> ▋</span>';
+
+    const sys=`你是AI作文评析系统的调度总指挥。请快速分析这篇${lang==='zh'?'中文':'英文'}作文，用80字以内（中文）输出调度摘要：
+1) 文体类型
+2) 整体水平一句话印象
+3) 最值得关注的一点
+
+最后一行必须输出（不要解释）：
+META:{"type":"文体名","isNarrative":true或false,"isZh":${lang==='zh'},"level":"elementary或middle或high或college"}`;
+
+    let full=''; let meta=null;
+    streamCall({
+      sys, usr:essay, maxTokens:280,
+      onChunk(c){
+        full+=c;
+        const disp=full.replace(/\nMETA:\{[^}]*\}\s*$/,'');
+        body.innerHTML='<span style="font-family:\'DM Mono\',monospace;font-size:12px;color:var(--text2);white-space:pre-wrap">'+escHtml(disp)+'</span><span style="animation:blink .7s step-end infinite;color:var(--c-dispatch)"> ▋</span>';
+      },
+      onDone(){
+        const m=full.match(/META:(\{[^}]+\})/);
+        if(m){ try{meta=JSON.parse(m[1]);}catch{} }
+        const disp=full.replace(/\nMETA:\{[^}]*\}\s*$/,'').trim();
+        body.innerHTML='<span style="font-family:\'DM Mono\',monospace;font-size:12px;color:var(--text2);white-space:pre-wrap">'+escHtml(disp)+'</span>';
+        doneAgents++; runningAgents=Math.max(0,runningAgents-1);
+        updateStats();
+        resolve(meta||{type:'议论文',isNarrative:false,isZh:lang==='zh',level:'high'});
+      },
+      onError(e){
+        body.innerHTML='<span style="color:#ef4444;font-size:12px">[错误] '+escHtml(e)+'</span>';
+        doneAgents++; runningAgents=Math.max(0,runningAgents-1);
+        updateStats();
+        resolve({type:'议论文',isNarrative:false,isZh:lang==='zh',level:'high'});
+      }
+    });
+    runningAgents++; updateStats();
+  });
 }
 
-// Initial lang state
-langBadge.textContent = '语言检测中…';
-langBadge.className = 'lang-badge';
+function escHtml(s){
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* ═══ MAIN START ═══ */
+async function startAnalysis(){
+  const essay=document.getElementById('essayInput').value.trim();
+  if(!essay){ showToast('请先输入作文内容',true); return; }
+  if(!cfg.apiKey){ showToast('请先配置 API Key',true); openSettings(); return; }
+
+  const lang=detectLang(essay);
+  doneAgents=0; runningAgents=0; totalAgents=0;
+
+  // Switch to dashboard
+  document.getElementById('inputScreen').style.display='none';
+  const dash=document.getElementById('dashboardScreen');
+  dash.style.display='block';
+  window.scrollTo({top:0});
+
+  // Build core panels
+  document.getElementById('coreGrid').innerHTML='';
+  CORE_AGENTS.forEach(a=>document.getElementById('coreGrid').appendChild(buildCard(a)));
+
+  // Total: dispatcher(1) + 5 core + conditionals TBD
+  totalAgents=1+CORE_AGENTS.length;
+  document.getElementById('statTotal').textContent='?';
+  document.getElementById('dashTitle').textContent='调度总指挥分析中…';
+
+  // Run dispatcher
+  const meta=await runDispatcher(essay,lang);
+
+  // Determine active conditional agents
+  const active=CONDITIONAL_AGENTS.filter(a=>a.condition(meta));
+
+  if(active.length>0){
+    document.getElementById('conditionalSection').style.display='block';
+    const cg=document.getElementById('conditionalGrid');
+    cg.innerHTML='';
+    active.forEach(a=>cg.appendChild(buildCard(a)));
+  }
+
+  totalAgents=1+CORE_AGENTS.length+active.length;
+  document.getElementById('statTotal').textContent=totalAgents;
+  document.getElementById('dashTitle').textContent='并发运行 '+totalAgents+' 个 Agent…';
+
+  const stagger=cfg.concurrency==='staggered'?150:40;
+
+  // Fire core agents
+  CORE_AGENTS.forEach((a,i)=>{
+    setTimeout(()=>runAgent(a,essay,lang,meta), i*stagger);
+  });
+
+  // Fire conditional agents
+  active.forEach((a,i)=>{
+    setTimeout(()=>runAgent(a,essay,lang,meta), CORE_AGENTS.length*stagger+200+i*(stagger+60));
+  });
+}
+
+/* ═══ INPUT INTERACTIONS ═══ */
+document.getElementById('essayInput').addEventListener('input',function(){
+  const t=this.value;
+  document.getElementById('charCount').textContent=t.length+' 字符';
+  const pill=document.getElementById('langPill');
+  if(!t.length){ pill.className='lang-pill'; pill.textContent='自动检测语言'; return; }
+  const l=detectLang(t);
+  if(l==='zh'){pill.className='lang-pill zh';pill.textContent='中文作文 · ZH';}
+  else{pill.className='lang-pill en';pill.textContent='English Essay · EN';}
+});
+document.getElementById('analyzeBtn').addEventListener('click',startAnalysis);
+document.getElementById('clearBtn').addEventListener('click',()=>{
+  document.getElementById('essayInput').value='';
+  document.getElementById('essayInput').dispatchEvent(new Event('input'));
+});
+document.getElementById('backBtn').addEventListener('click',()=>{
+  document.getElementById('dashboardScreen').style.display='none';
+  document.getElementById('inputScreen').style.display='block';
+  window.scrollTo({top:0});
+});
+
+/* ═══ AGENT PREVIEW CHIPS ═══ */
+(function(){
+  const c=document.getElementById('agentPreview');
+  [...CORE_AGENTS,...CONDITIONAL_AGENTS].forEach(a=>{
+    const el=document.createElement('div');
+    el.className='preview-chip';
+    el.style.borderLeftColor=a.color;
+    el.innerHTML=`<div class="preview-chip-emoji">${a.emoji}</div>
+<div><div class="preview-chip-name">${a.name}</div>
+<div class="preview-chip-type">${a.badge==='CORE'?'核心':'条件'} · ${a.en}</div></div>`;
+    c.appendChild(el);
+  });
+})();
+
+/* ═══ SETTINGS ═══ */
+function openSettings(){
+  document.getElementById('apiKeyInput').value=cfg.apiKey;
+  document.getElementById('modelSel').value=cfg.model;
+  document.getElementById('concurrencySel').value=cfg.concurrency||'staggered';
+  refreshStatus();
+  document.getElementById('settingsModal').classList.add('open');
+}
+function closeSettings(){ document.getElementById('settingsModal').classList.remove('open'); }
+function refreshStatus(){
+  const i=document.getElementById('sindic');
+  const m=document.getElementById('statusMsg');
+  if(cfg.apiKey){ i.className='sindic ok'; m.textContent='已配置 · '+cfg.model; }
+  else{ i.className='sindic'; m.textContent='尚未配置'; }
+}
+document.getElementById('settingsBtn').addEventListener('click',openSettings);
+document.getElementById('modalClose').addEventListener('click',closeSettings);
+document.getElementById('settingsModal').addEventListener('click',e=>{ if(e.target.id==='settingsModal') closeSettings(); });
+document.getElementById('saveBtn').addEventListener('click',()=>{
+  cfg.apiKey=document.getElementById('apiKeyInput').value.trim();
+  cfg.model=document.getElementById('modelSel').value;
+  cfg.concurrency=document.getElementById('concurrencySel').value;
+  localStorage.setItem('wenjian-v2',JSON.stringify(cfg));
+  refreshStatus();
+  showToast('设置已保存 ✓');
+  setTimeout(closeSettings,700);
+});
+let eyeVisible=false;
+document.getElementById('eyeBtn').addEventListener('click',()=>{
+  eyeVisible=!eyeVisible;
+  document.getElementById('apiKeyInput').type=eyeVisible?'text':'password';
+});
+
+/* ═══ TOAST ═══ */
+function showToast(msg,warn=false){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className='toast'+(warn?' warn':'');
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),3000);
+}
+
+/* ═══ INIT ═══ */
+refreshStatus();
+if(!cfg.apiKey) setTimeout(()=>showToast('点击右上角 ⚙ 配置 API Key'),1000);
 </script>
 </body>
 </html>
